@@ -1,0 +1,65 @@
+name = "qwen3-4b-cross-method-development"
+seed = 20260712
+
+[model]
+id = "Qwen/Qwen3-4B-Instruct-2507"
+revision = "cdbee75f17c01a7cc42f958dc650907174af0554"
+local_files_only = true
+dtype = "bfloat16"
+# device_map omitted: load fully resident on CPU (no accelerate disk offload)
+
+# hidden_state_index selects the matched residual stream both methods read.
+# Index 0 is the embedding output; index k is the residual stream after block k.
+# The J-lens capture layer is hidden_state_index minus one, so the Jacobian
+# estimate hooks block k-1 whose output equals hidden_states[k]. This is the
+# alignment that lets the two methods score the same physical activations.
+[activations]
+hidden_state_index = 18
+corpus_path = "data/calibration_prompts.jsonl"
+max_prompts = 4
+batch_size = 1
+
+# The controlled concept bank matches the J-lens estimation configuration so the
+# two studies compare the same directed subset of tokens.
+[concepts]
+tokens = [
+  " truth",
+  " false",
+  " plan",
+  " answer",
+  " doubt",
+  " safe",
+  " cat",
+  " dog",
+  " France",
+  " blue",
+  " hammer",
+  " C",
+  " B",
+]
+
+[jlens]
+include_future = true
+vjp_chunk_size = 32
+
+# The discrete code stands in for the words a language-model verbalizer emits.
+[autoencoder]
+code_length = 4
+code_vocab = 64
+width = 256
+embedding_dim = 32
+temperature = 1.0
+
+[train]
+steps = 600
+lr = 0.01
+batch_size = 128
+entropy_weight = 0.01
+
+# test_fraction holds out rows for both the J-lens fidelity probe and the
+# autoencoder gist probe. fidelity_threshold and retention_threshold place each
+# concept in one of the four agreement quadrants.
+[agreement]
+test_fraction = 0.5
+fidelity_threshold = 0.5
+retention_threshold = 0.5
