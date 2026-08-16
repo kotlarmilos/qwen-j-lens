@@ -323,20 +323,66 @@ code, which is exactly the failure the entropy bonus is supposed to prevent.
 Sweeping `entropy_weight` across 0.01, 0.1, 0.5, and 2.0 raised code usage but moved
 the best relative error only to 1.003, still short of the 0.950 baseline.
 
-The counting argument says this was predictable. Four slots over sixty-four symbols
-is `4 * log2(64) = 24` bits. Twenty-four bits cannot preserve a 4096-dimensional
-bfloat16 residual stream, so the only question was ever whether the evaluation sample
-was diverse enough to reveal it.
+The counting argument looks like it explains this. Four slots over sixty-four symbols
+is `4 * log2(64) = 24` bits, and twenty-four bits look far too few for a
+4096-dimensional bfloat16 residual stream. That argument is wrong, and the way it
+fails is the more useful lesson.
 
-Three habits follow, and they generalize past this repository. Always report a
+## Separating capacity from optimization
+
+`scripts/bit_budget_study.py` tests the counting argument on real
+Qwen3-4B-Instruct-2507 layer-18 activations, 9,877 rows over 64 prompts, on a CPU.
+Start with a continuous reference. A rank-k principal-component reconstruction costs
+thirty-two bits per component, so it sits on the same bit axis as the discrete code.
+Rank one, thirty-two bits, drops the error from the 0.9851 mean predictor to 0.0104.
+These activations are close to rank one in energy, so the information a twenty-four
+bit code would need is available in principle.
+
+Now sweep the discrete code at the published recipe:
+
+| Code shape | Bits | Relative error | Distinct codes |
+| --- | --- | --- | --- |
+| 4 x 64 | 24 | 1.0068 | 1 |
+| 16 x 64 | 96 | 0.4039 | 3 |
+| 32 x 64 | 192 | 1.0068 | 1 |
+| 128 x 64 | 768 | 0.0899 | 12 |
+| 256 x 64 | 1536 | 0.2692 | 7 |
+
+Ninety-six bits beat one hundred and ninety-two, and seven hundred and sixty-eight
+beat one thousand five hundred and thirty-six. A capacity frontier is monotone in
+bits, so this is not one. Four shapes that all cost exactly ninety-six bits spread
+from 0.0913 to 0.4039, which confirms that bits do not determine the outcome.
+
+Refitting one configuration under twenty seeds, with everything else fixed, shows
+what does:
+
+| Configuration | Bits | Escaped collapse | Best escaped error | Median | Spread |
+| --- | --- | --- | --- | --- | --- |
+| 4 x 64, width 256 | 24 | 2 of 20 | 0.1300 | 1.0066 | 0.8771 |
+| 16 x 64, width 1024 | 96 | 3 of 20 | 0.0616 | 1.0068 | 0.9503 |
+| 32 x 64, width 1024 | 192 | 8 of 20 | 0.0667 | 1.0063 | 0.9403 |
+| 32 x 64, width 4096 | 192 | 9 of 20 | 0.0567 | 1.0065 | 0.9510 |
+
+The twenty-four bit code does reach 0.1300 on two seeds out of twenty, so the
+counting argument was wrong. Bits raise the probability of escaping collapse, from
+two in twenty to eight in twenty, without improving the error once escaped, which
+stays between 0.057 and 0.130 at every budget. The spread inside one configuration,
+up to 0.95, is larger than any difference between configurations. The straight-through
+estimator plus the entropy bonus is a bimodal optimization, and a single run samples
+from that bimodal distribution rather than measuring a capacity.
+
+Four habits follow, and they generalize past this repository. Always report a
 trivial-predictor baseline next to any normalized error, because a metric bounded
 below by zero invites reading a small number as success. Always sweep sample size
 when a result comes from a small sample, since a result that only exists at small
 scale is a property of the sample. Always measure how much of a discrete code space
 is occupied, because a collapsed bottleneck produces reconstructions that cannot
-depend on the input. The positive control in `tests/test_nla_capacity.py` shows the
-diagnostic reports genuine success when it exists, since clustered rows keep a low
-error at every row count.
+depend on the input. And before attributing a failure to capacity, refit the same
+configuration under several seeds, because an unstable optimization produces curves
+that look like frontiers and are not. The positive control in
+`tests/test_nla_capacity.py` shows the diagnostic reports genuine success when it
+exists, since clustered rows keep a low error at every row count, and the seed
+controls there check that a repeated seed reproduces its error exactly.
 
 Everything here is tested against the tiny local transformer in `tests/toy.py`.
 The two single-method open-weight Qwen runs remain pending accelerator jobs, and no

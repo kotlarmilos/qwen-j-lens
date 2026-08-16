@@ -1,6 +1,6 @@
 {
   "artifact_schema_version": 2,
-  "claim_status": "Publication-scale Qwen3-8B results are limited to the cross-method agreement run and its capacity diagnostic, both recorded under publication_scale_runs. The cross-method run is reported as a diagnosed failure of the autoencoder side rather than an agreement measurement, and the capacity diagnostic supersedes the development-scale reconstruction error of 0.006 by showing it was a redundancy artifact of a sixty-four row sample. The two single-method 8B runs remain pending and are listed under pending_qwen_experiments. Development-scale Qwen3-4B runs are recorded under local_development_runs and are explicitly not publication measurements.",
+  "claim_status": "Publication-scale Qwen3-8B results are limited to the cross-method agreement run and its capacity diagnostic, both recorded under publication_scale_runs. The cross-method run is reported as a diagnosed failure of the autoencoder side rather than an agreement measurement. Two corrections apply to the development-scale reconstruction error of 0.006. The row-count sweep shows it was a redundancy artifact of a sixty-four row sample. The bit-budget and seed-stability study under local_development_runs then shows that the capacity explanation offered for the failure was itself wrong, since the twenty-four bit code escapes collapse on two seeds of twenty and the within-configuration spread exceeds every between-configuration difference. Any single-seed reconstruction error from this bottleneck is therefore reported as a draw from a bimodal distribution rather than as a measurement. The two single-method 8B runs remain pending and are listed under pending_qwen_experiments. Development-scale Qwen3-4B runs are recorded under local_development_runs and are explicitly not publication measurements.",
   "local_development_runs": {
     "hardware": "Apple Silicon (arm64) CPU, 16 GiB unified memory, macOS. No CUDA. Model loaded fully resident on CPU (device_map omitted) in bfloat16.",
     "model_id": "Qwen/Qwen3-4B-Instruct-2507",
@@ -82,6 +82,79 @@
         "records_sha256": "f400ac81af619ae1e0218f1eb5802911850a3b081ef796101aada51657d51968",
         "spearman_rho": 0.5277986629117476,
         "stage": "cross-run"
+      },
+      {
+        "activation_rows": 9877,
+        "artifact_dir": "artifacts/qwen3-4b-bit-budget-layer18",
+        "artifact_sha256": {
+          "bit-budget.json": "d6cc42ba284791257fbe28da074b7317139376be499d1dee05e1c37543227c04"
+        },
+        "baselines": {
+          "constant_energy_fraction": 0.014913618564605713,
+          "mean_predictor": 0.9850863814353943,
+          "zero_predictor": 1.0
+        },
+        "calibration_prompts": 64,
+        "caveat": "Twenty seeds resolve an escape rate to about one part in twenty, so the difference between two in twenty and three in twenty is not resolved. The sweeps hold the published six-hundred step schedule fixed, so a longer schedule or a temperature anneal could raise the escape rate at every budget. The study runs at 4B layer 18 on a CPU and an 8B replication needs an accelerator.",
+        "collapse_threshold": 0.9850863814353943,
+        "command": "python scripts/bit_budget_study.py --config configs/cross-4b-dev.toml --corpus data/publication_calibration_prompts.jsonl --prompts 64",
+        "config": "configs/cross-4b-dev.toml",
+        "corrects": "Supersedes the capacity explanation recorded for the Qwen3-8B capacity diagnostic. Twenty-four bits are not the barrier.",
+        "finding": "The bit budget is not the binding constraint. The relative error is not monotone in bits, since ninety-six bits reach 0.4039 while one hundred and ninety-two reach 1.0068, and four shapes that all cost ninety-six bits spread from 0.0913 to 0.4039. Refitting each configuration under twenty seeds shows why. The published twenty-four bit shape escapes collapse on two seeds of twenty and reaches 0.1300, so the earlier counting argument was wrong. Bits raise the escape probability from two in twenty at twenty-four bits to eight in twenty at one hundred and ninety-two without improving the error once escaped, which stays between 0.0567 and 0.1300. The within-configuration spread reaches 0.9510, larger than any difference between configurations, so a single-seed reconstruction error from this bottleneck is not an interpretable measurement. A rank-one principal component costing thirty-two bits reaches 0.0104, more than five times better than the best discrete run at any budget.",
+        "hidden_size": 2560,
+        "hidden_state_index": 18,
+        "linear_reference_best": {
+          "bits": 16384,
+          "rank": 512,
+          "relative_error": 0.0011006100103259087
+        },
+        "linear_reference_rank_one": {
+          "bits": 32,
+          "rank": 1,
+          "relative_error": 0.010383350774645805
+        },
+        "method": "bit-budget frontier and optimization-stability control",
+        "name": "qwen3-4b-bit-budget-layer18",
+        "records": "artifacts/qwen3-4b-bit-budget-layer18/records.json",
+        "records_sha256": "c2e06b3c75c5ff98dd6de479a840d1f14d36960c78bf68683cd92780b5af9b87",
+        "seed_stability_summary": {
+          "published_24_bits": {
+            "best": 0.12995709478855133,
+            "bits": 24.0,
+            "escape_rate": 0.1,
+            "median": 1.0066242814064026,
+            "spread": 0.8771450370550156
+          },
+          "wide_decoder_192_bits": {
+            "best": 0.05669652670621872,
+            "bits": 192.0,
+            "escape_rate": 0.45,
+            "median": 1.0064823031425476,
+            "spread": 0.9510490968823433
+          },
+          "wider_192_bits": {
+            "best": 0.06666669994592667,
+            "bits": 192.0,
+            "escape_rate": 0.4,
+            "median": 1.006299912929535,
+            "spread": 0.9402977451682091
+          },
+          "wider_96_bits": {
+            "best": 0.06160908192396164,
+            "bits": 96.0,
+            "escape_rate": 0.15,
+            "median": 1.0068333148956299,
+            "spread": 0.9503439143300056
+          }
+        },
+        "stage": "capacity-and-stability",
+        "train": {
+          "batch_size": 128,
+          "embedding_dim": 32,
+          "lr": 0.01,
+          "steps": 600,
+          "temperature": 1.0
+        }
       }
     ],
     "scope": "development-scale local runs on the real Qwen3-4B-Instruct-2507 weights, not publication measurements"
@@ -232,7 +305,7 @@
             "rows": 39697
           }
         ],
-        "finding": "The development-scale reconstruction error of 0.006 was a redundancy artifact of a sixty-four row sample, not evidence of compression. Holding model, layer, and hyperparameters fixed on one 8B activation matrix, sixty-four rows give 0.0147 and every larger row count returns to about 1.00. The discrete bottleneck occupies between one and eight of the 16,777,216 available codes at every scale, and no entropy weight tested brings the error below the 0.950 constant-mean-predictor baseline. A twenty-four bit code cannot preserve a 4096-dimensional residual stream.",
+        "finding": "The development-scale reconstruction error of 0.006 was a redundancy artifact of a sixty-four row sample, not evidence of compression. Holding model, layer, and hyperparameters fixed on one 8B activation matrix, sixty-four rows give 0.0147 and every larger row count returns to about 1.00. The discrete bottleneck occupies between one and eight of the 16,777,216 available codes at every scale, and no entropy weight tested brings the error below the 0.950 constant-mean-predictor baseline. The capacity explanation first offered for this, that a twenty-four bit code cannot preserve a 4096-dimensional residual stream, is superseded by qwen3-4b-bit-budget-layer18, which shows the same shape escapes collapse on two seeds of twenty. The binding constraint is optimization stability, not capacity.",
         "hidden_size": 4096,
         "hidden_state_index": 25,
         "method": "autoencoder-capacity-diagnostic",
@@ -292,7 +365,8 @@
           }
         ],
         "source_config": "configs/cross-8b-publication.toml",
-        "stage": "capacity-report"
+        "stage": "capacity-report",
+        "superseded_by": "qwen3-4b-bit-budget-layer18"
       }
     ],
     "scope": "publication-scale runs on the real Qwen3-8B weights, executed on a rented single-GPU host"

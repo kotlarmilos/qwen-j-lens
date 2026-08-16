@@ -11,6 +11,7 @@ from qwen_j_lens.nla.capacity import (
     entropy_weight_sweep,
     linear_reference,
     row_count_sweep,
+    seed_stability,
     trivial_baselines,
 )
 from qwen_j_lens.nla.train import train_autoencoder
@@ -253,3 +254,90 @@ def test_bit_budget_sweep_carries_width_as_its_own_axis() -> None:
 
     assert [point.width for point in points] == [16, 64]
     assert all(point.bits == 12.0 for point in points)
+
+
+def test_seed_stability_reports_one_error_per_seed() -> None:
+    activations = _clustered(120, 32, clusters=4, seed=9)
+
+    result = seed_stability(
+        activations,
+        [0, 1, 2],
+        code_length=2,
+        code_vocab=8,
+        width=32,
+        embedding_dim=8,
+        temperature=1.0,
+        steps=80,
+        lr=0.01,
+        batch_size=32,
+        entropy_weight=0.1,
+    )
+
+    assert result.seeds == (0, 1, 2)
+    assert len(result.relative_errors) == 3
+    assert len(result.distinct_codes) == 3
+    assert result.best <= result.median <= result.worst
+    assert result.spread == pytest.approx(result.worst - result.best)
+
+
+def test_seed_stability_collapses_to_zero_spread_for_one_seed() -> None:
+    """A single seed cannot express variance, so the spread must vanish."""
+    activations = _clustered(96, 32, clusters=3, seed=4)
+
+    result = seed_stability(
+        activations,
+        [7],
+        code_length=2,
+        code_vocab=8,
+        width=32,
+        embedding_dim=8,
+        temperature=1.0,
+        steps=60,
+        lr=0.01,
+        batch_size=32,
+        entropy_weight=0.1,
+    )
+
+    assert result.spread == 0.0
+    assert result.best == result.worst == result.median
+
+
+def test_seed_stability_is_reproducible_for_a_repeated_seed() -> None:
+    """The same seed must give the same error, or the control measures noise."""
+    activations = _clustered(96, 32, clusters=3, seed=4)
+
+    result = seed_stability(
+        activations,
+        [11, 11],
+        code_length=2,
+        code_vocab=8,
+        width=32,
+        embedding_dim=8,
+        temperature=1.0,
+        steps=60,
+        lr=0.01,
+        batch_size=32,
+        entropy_weight=0.1,
+    )
+
+    assert result.relative_errors[0] == pytest.approx(result.relative_errors[1])
+    assert result.spread == pytest.approx(0.0, abs=1e-9)
+
+
+def test_seed_stability_rejects_an_empty_seed_list() -> None:
+    activations = _clustered(64, 16, clusters=2, seed=1)
+
+    with pytest.raises(ValueError, match="at least one seed"):
+        seed_stability(
+            activations,
+            [],
+            code_length=2,
+            code_vocab=4,
+            width=16,
+            embedding_dim=8,
+            temperature=1.0,
+            steps=20,
+            lr=0.01,
+            batch_size=16,
+            entropy_weight=0.1,
+        )

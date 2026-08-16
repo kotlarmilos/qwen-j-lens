@@ -9,6 +9,10 @@ build/
 *.egg-info/
 artifacts/evaluation/
 
+# Cached activation matrices. These are large and fully regenerable from the
+# model weights, so the script rebuilds them when the cache is absent.
+.cache/
+
 # Real Qwen run outputs stay tracked. They are the evidence for every measured
 # number in the article and total well under a megabyte, so a reader can check
 # the claims against the committed artifacts.

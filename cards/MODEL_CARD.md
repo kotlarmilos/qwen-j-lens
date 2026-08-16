@@ -78,6 +78,16 @@ not sufficient evidence of a faithful description. The independent-reader gap an
 the gist-versus-specific probe are the checks that separate a faithful code from
 a co-adapted private code or a gist-only code.
 
+The straight-through discrete bottleneck is unstable across random seeds. Refitting
+one fixed configuration twenty times on real Qwen3-4B layer-18 activations shows the
+fit collapses onto a near-constant code on most seeds, with a within-configuration
+error spread up to 0.9510 that exceeds every difference between the configurations
+tested. A single-seed reconstruction error from this bottleneck is a draw from a
+bimodal distribution rather than a measurement, so it should be reported over several
+seeds together with a trivial-predictor baseline. The evidence is in
+`artifacts/qwen3-4b-bit-budget-layer18` and the diagnostic lives in
+`src/qwen_j_lens/nla/capacity.py`.
+
 ## Project links
 
 The project article is

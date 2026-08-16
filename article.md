@@ -293,22 +293,113 @@ collapsed. Sweeping the entropy bonus that opposes collapse, across 0.01, 0.1, 0
 and 2.0, moved the best relative error only to 1.003, still short of the 0.950 that a
 constant vector achieves.
 
-The honest conclusion is that a discrete code of four slots over sixty-four symbols
-carries at most twenty-four bits, and twenty-four bits do not preserve a
-4096-dimensional residual stream. The development-scale reconstruction error of 0.006
-measured redundancy in a tiny activation sample rather than faithful compression, and
-reporting it without the row-count control would have been a mistake. This correction
-matters more than the original number did, because it changes what the metric is
-evidence for. It also strengthens rather than weakens the earlier cross-method
-finding, since the concepts fell in the neither quadrant at both scales, and the
-publication-scale run now shows that the autoencoder side of that comparison was
-never carrying information to begin with.
+The first explanation I reached for was capacity. A discrete code of four slots over
+sixty-four symbols carries at most twenty-four bits, and twenty-four bits look far
+too few to preserve a 4096-dimensional residual stream. Part of that correction
+stands. The development-scale reconstruction error of 0.006 measured redundancy in a
+tiny activation sample rather than faithful compression, and reporting it without the
+row-count control would have been a mistake. The capacity explanation itself does not
+stand, and the next section is the control that rejects it. Either way the earlier
+cross-method finding is strengthened rather than weakened, since the concepts fell in
+the neither quadrant at both scales, and the publication-scale run shows the
+autoencoder side of that comparison was never carrying information to begin with.
 
-Two limits bound the correction. The sweep varies the sample and the entropy bonus
-but holds the architecture fixed, so it shows this bottleneck fails at this width
-rather than that no discrete code can succeed. The 8B J-lens and autoencoder
-publication runs at the preregistered layer remain separate pending jobs, so this
-result speaks to the cross-method study alone.
+## The bit budget is not what binds
+
+Testing a capacity claim needs a frontier rather than a single point, so
+`scripts/bit_budget_study.py` sweeps the code shape and compares it against a
+continuous code at a matched budget. It runs on real Qwen3-4B-Instruct-2507 layer-18
+activations, 9,877 rows over 64 calibration prompts, on this laptop with no
+accelerator. Working at 4B is deliberate, since the 0.006 claim was made at 4B and
+the fairest place to test a claim is the setting that produced it.
+
+The reference comes first. A rank-k principal-component reconstruction is a
+continuous code costing thirty-two bits per component, which puts it on the same axis
+as the discrete code.
+
+| Retained components | Bits | Relative error |
+| --- | --- | --- |
+| 0 | 0 | 0.9851 |
+| 1 | 32 | 0.0104 |
+| 2 | 64 | 0.0068 |
+| 8 | 256 | 0.0059 |
+| 64 | 2048 | 0.0039 |
+| 512 | 16384 | 0.0011 |
+
+One principal direction, thirty-two bits, takes the error from 0.9851 to 0.0104. The
+information is not the problem. These activations are close to rank one in energy, so
+a twenty-four bit code has enough room in principle to place a row along a single
+dominant direction.
+
+The discrete sweep uses the published recipe, entropy weight 0.01 and decoder width
+1024.
+
+| Code shape | Bits | Relative error | Distinct codes |
+| --- | --- | --- | --- |
+| 4 x 64 | 24 | 1.0068 | 1 |
+| 8 x 64 | 48 | 1.0068 | 1 |
+| 16 x 64 | 96 | 0.4039 | 3 |
+| 32 x 64 | 192 | 1.0068 | 1 |
+| 64 x 64 | 384 | 1.0067 | 5 |
+| 128 x 64 | 768 | 0.0899 | 12 |
+| 256 x 64 | 1536 | 0.2692 | 7 |
+
+The curve is not monotone. Ninety-six bits beat both one hundred and ninety-two and
+three hundred and eighty-four. A capacity frontier cannot do that, so something other
+than capacity is moving these numbers.
+
+Two controls narrow it down. Four different shapes that all cost exactly ninety-six
+bits give errors of 0.4039, 0.1372, 0.0913, and 0.1248, so bits are not a sufficient
+statistic for the outcome. Holding the budget at one hundred and ninety-two bits and
+varying only the decoder width gives 1.0066 at width 256, 1.0068 at width 1024, and
+0.0797 at width 4096, so the decoder matters without explaining the pattern either.
+
+The decisive control is the seed. Everything is held fixed except initialization and
+batch order, and each configuration is refit twenty times. A fit counts as escaping
+collapse when it beats the 0.9851 mean predictor.
+
+| Configuration | Bits | Escaped | Best escaped error | Median | Spread |
+| --- | --- | --- | --- | --- | --- |
+| 4 x 64, width 256 | 24 | 2 of 20 | 0.1300 | 1.0066 | 0.8771 |
+| 16 x 64, width 1024 | 96 | 3 of 20 | 0.0616 | 1.0068 | 0.9503 |
+| 32 x 64, width 1024 | 192 | 8 of 20 | 0.0667 | 1.0063 | 0.9403 |
+| 32 x 64, width 4096 | 192 | 9 of 20 | 0.0567 | 1.0065 | 0.9510 |
+
+This settles it. The published twenty-four bit shape does reach 0.1300, on two seeds
+out of twenty, so twenty-four bits are not the barrier and the counting argument was
+wrong. What the bit budget buys is the probability of escaping collapse, which rises
+from two in twenty at twenty-four bits to eight in twenty at one hundred and
+ninety-two. What it does not buy is accuracy once escaped, which sits between 0.057
+and 0.130 across every budget tested. Quadrupling the decoder width adds one escape
+out of twenty.
+
+The spread within a single configuration reaches 0.95, which is larger than any
+difference between configurations. A bit-budget curve read without this control is a
+scatter plot of an unstable optimization presented as a frontier. The 1.008 that the
+8B run produced is close to the median outcome, and that run drew one seed.
+
+Two conclusions survive. The straight-through discrete bottleneck used here collapses
+on most seeds at every budget tested, so any single-seed reconstruction error from it
+is close to uninformative and belongs in a report as a distribution over seeds rather
+than as a number. And its best result anywhere in the sweep, 0.0567 at one hundred
+and ninety-two bits, stays more than five times worse than one principal component at
+thirty-two bits. On these activations the discrete natural-language code buys nothing
+over a single linear direction and costs a great deal of stability.
+
+I was wrong twice on the way here. The first reading was that 0.006 showed
+compression, and the row-count sweep rejected it. The second reading was that
+twenty-four bits were too few, and the seed sweep rejected that too. Both corrections
+came from controls that cost minutes on a laptop, which is the argument for running
+them before publishing a number rather than after.
+
+The limits are specific. Twenty seeds estimate an escape rate to about one part in
+twenty, so the gap between two in twenty and three in twenty is not resolved. The
+sweeps use the published six-hundred step schedule, so a longer schedule or a
+temperature anneal might raise the escape rate at every budget. Everything in this
+section is measured at 4B layer 18 on a CPU, and an 8B replication needs an
+accelerator. The 8B J-lens and autoencoder publication runs at the preregistered
+layer remain separate pending jobs, so this result speaks to the cross-method study
+and to the autoencoder recipe rather than to the method in general.
 
 The remaining step is accelerator execution for the two single-method publication
 runs. The 8B primary estimate splits into ten checksum-validated shards at layer 24

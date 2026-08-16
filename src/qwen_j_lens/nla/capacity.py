@@ -89,6 +89,24 @@ class LinearReferencePoint:
     relative_error: float
 
 
+@dataclass(frozen=True)
+class SeedStability:
+    """Spread of one fixed configuration refit under several random seeds.
+
+    A bit budget only explains an outcome if the outcome is reproducible at that
+    budget. When `spread` is comparable to the distance between budgets, the
+    sweep is measuring optimization luck rather than capacity.
+    """
+
+    seeds: tuple[int, ...]
+    relative_errors: tuple[float, ...]
+    distinct_codes: tuple[int, ...]
+    best: float
+    worst: float
+    median: float
+    spread: float
+
+
 def code_bits(code_length: int, code_vocab: int) -> float:
     """Information capacity of the discrete code in bits.
 
@@ -378,6 +396,65 @@ def bit_budget_sweep(
             )
         )
     return points
+
+
+def seed_stability(
+    activations: Tensor,
+    seeds: Sequence[int],
+    *,
+    code_length: int,
+    code_vocab: int,
+    width: int,
+    embedding_dim: int,
+    temperature: float,
+    steps: int,
+    lr: float,
+    batch_size: int,
+    entropy_weight: float,
+) -> SeedStability:
+    """Refit one configuration under several seeds and report the spread.
+
+    Everything except the seed is held fixed, so the resulting range isolates the
+    contribution of initialization and batch order. This is the control that
+    decides whether a bit-budget curve is a capacity frontier or a scatter plot.
+    """
+    if activations.ndim != 2:
+        raise ValueError("Activations must be a two-dimensional row matrix")
+    if not seeds:
+        raise ValueError("Seed stability needs at least one seed")
+    errors: list[float] = []
+    codes: list[int] = []
+    for seed in seeds:
+        error, usage = _fit(
+            activations,
+            code_length=code_length,
+            code_vocab=code_vocab,
+            width=width,
+            embedding_dim=embedding_dim,
+            temperature=temperature,
+            steps=steps,
+            lr=lr,
+            batch_size=batch_size,
+            entropy_weight=entropy_weight,
+            seed=seed,
+        )
+        errors.append(error)
+        codes.append(usage.distinct_codes)
+    ordered = sorted(errors)
+    middle = len(ordered) // 2
+    if len(ordered) % 2 == 1:
+        median = ordered[middle]
+    else:
+        median = 0.5 * (ordered[middle - 1] + ordered[middle])
+    return SeedStability(
+        seeds=tuple(int(seed) for seed in seeds),
+        relative_errors=tuple(errors),
+        distinct_codes=tuple(codes),
+        best=ordered[0],
+        worst=ordered[-1],
+        median=median,
+        spread=ordered[-1] - ordered[0],
+    )
 
 
 def capacity_report(
