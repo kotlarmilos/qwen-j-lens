@@ -22,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Sequence
 
+import math
 import torch
 from torch import Tensor
 
@@ -65,6 +66,76 @@ class SweepPoint:
     relative_error: float
     distinct_codes: int
     code_entropy: float
+
+
+@dataclass(frozen=True)
+class BitBudgetPoint:
+    """One measured configuration in a code bit-budget sweep."""
+
+    code_length: int
+    code_vocab: int
+    width: int
+    bits: float
+    relative_error: float
+    distinct_codes: int
+    code_entropy: float
+
+
+@dataclass(frozen=True)
+class LinearReferencePoint:
+    """Relative error of a rank-limited linear reconstruction."""
+
+    rank: int
+    relative_error: float
+
+
+def code_bits(code_length: int, code_vocab: int) -> float:
+    """Information capacity of the discrete code in bits.
+
+    A code of `code_length` slots over `code_vocab` symbols can express
+    `code_vocab ** code_length` distinct messages, which is
+    `code_length * log2(code_vocab)` bits. This is an upper bound that assumes
+    the bottleneck uses its whole code space, so a collapsed code carries less.
+    """
+    if code_length <= 0 or code_vocab <= 0:
+        raise ValueError("Code dimensions must be positive")
+    return float(code_length) * math.log2(float(code_vocab))
+
+
+def linear_reference(
+    activations: Tensor, ranks: Sequence[int]
+) -> list[LinearReferencePoint]:
+    """Relative error of reconstructing rows from their top principal components.
+
+    This is the continuous counterpart to the discrete code. Rank zero keeps only
+    the mean and therefore reproduces the constant-predictor baseline exactly, so
+    the curve says how much of the residual stream is linearly compressible at
+    all. It bounds what any faithful discrete code has to compete with.
+    """
+    if activations.ndim != 2:
+        raise ValueError("Activations must be a two-dimensional row matrix")
+    target = activations.to(torch.float32)
+    energy = target.pow(2).sum(dim=-1).mean()
+    if float(energy) == 0.0:
+        raise ValueError("Activations carry no energy, so the metric is undefined")
+    mean = target.mean(dim=0, keepdim=True)
+    centered = target - mean
+    covariance = (centered.T @ centered) / centered.shape[0]
+    _, eigenvectors = torch.linalg.eigh(covariance)
+    ordered = eigenvectors.flip(-1)
+    points: list[LinearReferencePoint] = []
+    for rank in ranks:
+        if rank < 0:
+            raise ValueError("Ranks must not be negative")
+        usable = min(rank, ordered.shape[1])
+        if usable == 0:
+            residual = centered
+        else:
+            basis = ordered[:, :usable]
+            residual = centered - (centered @ basis) @ basis.T
+        error = float(residual.pow(2).sum(dim=-1).mean() / energy)
+        points.append(LinearReferencePoint(rank=usable, relative_error=error))
+    return points
 
 
 def trivial_baselines(activations: Tensor) -> TrivialBaselines:
@@ -250,6 +321,57 @@ def entropy_weight_sweep(
             SweepPoint(
                 rows=activations.shape[0],
                 entropy_weight=weight,
+                relative_error=error,
+                distinct_codes=usage.distinct_codes,
+                code_entropy=usage.code_entropy,
+            )
+        )
+    return points
+
+
+def bit_budget_sweep(
+    activations: Tensor,
+    specs: Sequence[tuple[int, int, int]],
+    *,
+    embedding_dim: int,
+    temperature: float,
+    steps: int,
+    lr: float,
+    batch_size: int,
+    entropy_weight: float,
+    seed: int,
+) -> list[BitBudgetPoint]:
+    """Refit the autoencoder across code shapes and decoder widths.
+
+    Each spec is a `(code_length, code_vocab, width)` triple. Sweeping the code
+    shape answers how many bits the bottleneck needs, and carrying `width` as an
+    explicit axis matters because the decoder passes the code through a hidden
+    layer of that size on the way to the activation. If width binds before bits
+    do, then the measured frontier describes the decoder rather than the code.
+    """
+    if activations.ndim != 2:
+        raise ValueError("Activations must be a two-dimensional row matrix")
+    points: list[BitBudgetPoint] = []
+    for code_length, code_vocab, width in specs:
+        error, usage = _fit(
+            activations,
+            code_length=code_length,
+            code_vocab=code_vocab,
+            width=width,
+            embedding_dim=embedding_dim,
+            temperature=temperature,
+            steps=steps,
+            lr=lr,
+            batch_size=batch_size,
+            entropy_weight=entropy_weight,
+            seed=seed,
+        )
+        points.append(
+            BitBudgetPoint(
+                code_length=code_length,
+                code_vocab=code_vocab,
+                width=width,
+                bits=code_bits(code_length, code_vocab),
                 relative_error=error,
                 distinct_codes=usage.distinct_codes,
                 code_entropy=usage.code_entropy,
