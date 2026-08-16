@@ -1,0 +1,11 @@
+{
+  "config": "wikitext-2-raw-v1",
+  "count": 1000,
+  "dataset": "Salesforce/wikitext",
+  "license": "CC BY-SA 3.0 and GFDL",
+  "output": "data/publication_calibration_prompts.jsonl",
+  "output_sha256": "7919f2c32e2fa0da9ab79690b00844d5d7ce6d52f76a2c8ca6dc010e8b891e3c",
+  "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+  "seed": 20260712,
+  "split": "train"
+}

@@ -1,0 +1,47 @@
+name = "qwen3-8b-primary-publication"
+seed = 20260712
+
+[model]
+# Verified public identifier. Qwen3-8B is post-trained and supports instruct use.
+id = "Qwen/Qwen3-8B"
+revision = "b968826d9c46dd6066d109eabc6255188de91218"
+local_files_only = true
+dtype = "bfloat16"
+device_map = "auto"
+enable_thinking = false
+
+[estimation]
+# The first primary run fixes one middle layer before looking at results.
+# A broader layer scan is a separate follow-up, not part of this claim.
+layers = [24]
+calibration_path = "data/publication_calibration_prompts.jsonl"
+# This declared bank supports controlled-subset interventions only.
+# It is not a vocabulary-wide J-space estimate.
+controlled_tokens = [
+  " truth",
+  " false",
+  " plan",
+  " answer",
+  " doubt",
+  " safe",
+  " cat",
+  " dog",
+  " France",
+  " blue",
+  " hammer",
+  " C",
+  " B",
+]
+include_future = true
+max_prompts = 1000
+batch_size = 1
+vjp_chunk_size = 32
+
+[evaluation]
+# Prompts use apply_chat_template with an assistant generation prompt.
+# Directed modulation and internal reasoning use activation trajectories.
+prompts_path = "data/evaluation_prompts.jsonl"
+seeds = [11, 29, 47, 71, 101]
+max_new_tokens = 96
+layer = 24
+temperature = 0.7

@@ -1,0 +1,40 @@
+name = "qwen3-8b-nla-primary"
+seed = 20260712
+
+[model]
+id = "Qwen/Qwen3-8B"
+revision = "b968826d9c46dd6066d109eabc6255188de91218"
+local_files_only = true
+dtype = "bfloat16"
+device_map = "auto"
+
+# hidden-state index. 0 is the embedding output; k is the residual stream after
+# block k. Layer 24 matches the preregistered middle layer used by the J-lens
+# evaluation so the two methods read the same location.
+[activations]
+layer = 24
+corpus_path = "data/publication_calibration_prompts.jsonl"
+max_prompts = 1000
+batch_size = 8
+
+[autoencoder]
+code_length = 8
+code_vocab = 256
+width = 1024
+embedding_dim = 64
+temperature = 1.0
+
+[train]
+steps = 4000
+lr = 0.005
+batch_size = 256
+entropy_weight = 0.01
+
+[faithfulness]
+test_fraction = 0.5
+reader_steps = 2000
+reader_lr = 0.02
+reader_width = 256
+reader_embedding_dim = 32
+gap_threshold = 0.2
+retained_threshold = 0.5

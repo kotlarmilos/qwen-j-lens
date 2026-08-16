@@ -1,0 +1,44 @@
+name = "qwen3-4b-development"
+seed = 20260712
+
+[model]
+id = "Qwen/Qwen3-4B-Instruct-2507"
+revision = "cdbee75f17c01a7cc42f958dc650907174af0554"
+local_files_only = true
+dtype = "bfloat16"
+device_map = "auto"
+enable_thinking = false
+
+[estimation]
+layers = [12, 24, 35]
+calibration_path = "data/calibration_prompts.jsonl"
+# This declared bank supports controlled-subset interventions only.
+# It is not a vocabulary-wide J-space estimate.
+controlled_tokens = [
+  " truth",
+  " false",
+  " plan",
+  " answer",
+  " doubt",
+  " safe",
+  " cat",
+  " dog",
+  " France",
+  " blue",
+  " hammer",
+  " C",
+  " B",
+]
+include_future = true
+max_prompts = 8
+batch_size = 1
+vjp_chunk_size = 32
+
+[evaluation]
+# Prompts use apply_chat_template with an assistant generation prompt.
+# Directed modulation and internal reasoning use activation trajectories.
+prompts_path = "data/evaluation_prompts.jsonl"
+seeds = [11]
+max_new_tokens = 48
+layer = 24
+temperature = 0.0
