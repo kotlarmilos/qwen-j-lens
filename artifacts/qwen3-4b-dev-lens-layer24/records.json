@@ -1,0 +1,49 @@
+[
+  {
+    "kind": "npy",
+    "metadata": {
+      "construction": "selected rows of W_U J_l estimated directly by VJP",
+      "context_count": 2,
+      "layer": 24,
+      "pair_count": 291,
+      "token_ids": [
+        8046,
+        895,
+        3119,
+        4226,
+        10492,
+        6092,
+        8251,
+        5562,
+        9625,
+        6303,
+        23457,
+        356,
+        425
+      ],
+      "tokens": [
+        " truth",
+        " false",
+        " plan",
+        " answer",
+        " doubt",
+        " safe",
+        " cat",
+        " dog",
+        " France",
+        " blue",
+        " hammer",
+        " C",
+        " B"
+      ]
+    },
+    "path": "controlled-token-vectors-layer-024.npy",
+    "sha256": "bec56affc1f4523e41b66702c85467584ebb3c9da62364e93eba0418261b08ba"
+  },
+  {
+    "kind": "json",
+    "metadata": {},
+    "path": "run.json",
+    "sha256": "b3c72f6d64ef0b76ec4121c998aa4325ad906b145a16ae5c4d155e7c6fc67204"
+  }
+]

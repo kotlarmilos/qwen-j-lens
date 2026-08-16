@@ -7,8 +7,11 @@ __pycache__/
 dist/
 build/
 *.egg-info/
-artifacts/qwen3-*/
 artifacts/evaluation/
+
+# Real Qwen run outputs stay tracked. They are the evidence for every measured
+# number in the article and total well under a megabyte, so a reader can check
+# the claims against the committed artifacts.
 
 
 # Internal release checklist, not published

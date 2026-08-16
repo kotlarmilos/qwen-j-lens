@@ -1,0 +1,20 @@
+[
+  {
+    "kind": "json",
+    "metadata": {},
+    "path": "agreement.json",
+    "sha256": "f7c43e273d0ea1b049dcfc1794a3f69ef912e51e1757223248ca782bbfa8b78a"
+  },
+  {
+    "kind": "json",
+    "metadata": {},
+    "path": "training-history.json",
+    "sha256": "eb1cec8e8458a24fdf9c36b15238c5155ab07dd076a0f543e1a42506219f02b0"
+  },
+  {
+    "kind": "json",
+    "metadata": {},
+    "path": "run.json",
+    "sha256": "8568562c075fcb96b3119ea474a23e79dc7a9af35c06380b6ae7be4df6292cad"
+  }
+]

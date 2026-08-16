@@ -279,6 +279,67 @@ comparison shows that a low reconstruction error and a clean linear direction ca
 each miss the specific attribute a residual carries, which is a claim neither method
 can make on its own.
 
+## Why a low reconstruction error can mean nothing
+
+The 0.006 above is the most misleading number in this repository, and
+`src/qwen_j_lens/nla/capacity.py` exists because scaling to Qwen3-8B exposed it.
+
+Start with the metric. `reconstruction_error` in relative mode divides by the mean
+squared norm of the target, not by its variance:
+
+```
+relative_error = mean(||reconstruction - target||^2) / mean(||target||^2)
+```
+
+Two predictors that use no per-row information bracket every honest result. A zero
+predictor scores exactly 1.0 by construction. A constant mean predictor scores
+`1 - ||mean||^2 / mean(||x||^2)`, which is 0.950 on the 8B layer-24 sample. Any
+trained code that does not beat 0.950 has learned less than one fixed vector, even
+though its score still looks like a number between zero and one. The 8B run scored
+1.008, which is worse than predicting zero.
+
+Now hold the model, the layer, and every hyperparameter fixed and vary only how many
+activation rows the code must cover:
+
+| Activation rows | Relative error | Distinct codes used |
+| --- | --- | --- |
+| 64 | 0.0147 | 4 |
+| 128 | 1.0077 | 2 |
+| 256 | 1.0021 | 4 |
+| 1024 | 1.0029 | 8 |
+| 4096 | 1.0071 | 1 |
+| 16384 | 1.0064 | 4 |
+| 39697 | 1.0084 | 1 |
+
+Sixty-four rows of Qwen3-8B activations reproduce the development-scale result. One
+hundred and twenty-eight rows destroy it. The low error was a property of the sample
+size rather than of the model or the method, because a few dozen rows drawn from a
+handful of prompts sit close enough together that a handful of codes cover them.
+
+The distinct-code column explains the mechanism. The bottleneck has `code_length` 4
+slots over a `code_vocab` of 64 symbols, so 64^4 = 16,777,216 codes are available. The
+trained bottleneck used between one and eight. It collapsed onto a near-constant
+code, which is exactly the failure the entropy bonus is supposed to prevent.
+Sweeping `entropy_weight` across 0.01, 0.1, 0.5, and 2.0 raised code usage but moved
+the best relative error only to 1.003, still short of the 0.950 baseline.
+
+The counting argument says this was predictable. Four slots over sixty-four symbols
+is `4 * log2(64) = 24` bits. Twenty-four bits cannot preserve a 4096-dimensional
+bfloat16 residual stream, so the only question was ever whether the evaluation sample
+was diverse enough to reveal it.
+
+Three habits follow, and they generalize past this repository. Always report a
+trivial-predictor baseline next to any normalized error, because a metric bounded
+below by zero invites reading a small number as success. Always sweep sample size
+when a result comes from a small sample, since a result that only exists at small
+scale is a property of the sample. Always measure how much of a discrete code space
+is occupied, because a collapsed bottleneck produces reconstructions that cannot
+depend on the input. The positive control in `tests/test_nla_capacity.py` shows the
+diagnostic reports genuine success when it exists, since clustered rows keep a low
+error at every row count.
+
 Everything here is tested against the tiny local transformer in `tests/toy.py`.
-The open-weight Qwen runs for both methods remain pending accelerator jobs, and no
-reproduction number is claimed until those artifacts exist and are reviewed.
+The two single-method open-weight Qwen runs remain pending accelerator jobs, and no
+reproduction number is claimed until those artifacts exist and are reviewed. The
+cross-method study and the capacity diagnostics have run at publication scale on
+Qwen3-8B and are reported above.

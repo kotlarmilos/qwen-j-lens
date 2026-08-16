@@ -1,0 +1,1 @@
+{"baselines":["jacobian","logit"],"config":"qwen3-4b-local-development","enable_thinking":false,"jacobian_vectors":"artifacts/qwen3-4b-dev-lens-layer24/controlled-token-vectors-layer-024.npy","kv_cache":true,"layer":24,"model_id":"Qwen/Qwen3-4B-Instruct-2507","model_revision":"cdbee75f17c01a7cc42f958dc650907174af0554"}

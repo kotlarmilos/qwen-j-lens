@@ -1,0 +1,1 @@
+{"code_usage":{"distinct_code_fraction":0.015625,"mean_slot_entropy":0.058449216187000275,"vocabulary_fraction_used":0.0625},"independent_reader":{"co_adapted_test_error":0.03568239137530327,"gap":0.002312730997800827,"independent_test_error":0.037995122373104095},"reconstruction_error":0.023007525131106377}

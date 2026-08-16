@@ -230,7 +230,7 @@ bank. The single J-lens direction, read without the final normalization, predict
 the model's own next-token logit weakly at this scale. The lesson is that a low
 reconstruction error does not imply concept faithfulness, and that a clean linear
 direction and a discrete description can both miss the specific attribute a residual
-carries.
+carries. The scale-up described below revises how much that 0.006 was ever worth.
 
 Two honesty limits bound this result. The J-lens fidelity uses one stored direction
 with no final normalization while the autoencoder retention uses a multivariate
@@ -242,13 +242,82 @@ development-scale signals rather than publication measurements. The comparison s
 earns its place because even this negative result separates reconstruction quality
 from concept faithfulness in a way that neither method shows alone.
 
-The remaining step is accelerator execution at publication scale. The 8B primary
-estimate splits into ten checksum-validated shards at layer 24 followed by one
-dual-lens evaluation, and the autoencoder path collects activations at the same
-layer, trains the verbalizer and reconstructor, and writes the faithfulness audit.
-Until the 8B artifacts exist, the publication claim stays a reproducible experiment
-plan with tested local components and a verified 4B development run, not a
-reproduced publication result.
+## What broke at publication scale
+
+Running the identical study on Qwen3-8B is where the interesting result appears.
+Every method block in `configs/cross-8b-publication.toml` is copied verbatim from
+the 4B development configuration, so model scale, capture layer, corpus size, and
+device placement are the only variables. The run captured layer 24 of 36 across 256
+calibration prompts on one RTX A6000, producing 39,697 activation rows and 3,752,262
+position pairs, against 64 rows and 547 pairs at development scale.
+
+The autoencoder did not scale. Relative reconstruction error came out at 1.008
+against 0.006 at development scale, every concept's retention was exactly 0.0, and
+the reported Spearman and Pearson correlations were both exactly 0.0. Those zeros
+are the tell. A correlation of exactly zero across thirteen concepts is not a
+measurement, it is what a constant vector returns, so the run had to be diagnosed
+rather than reported.
+
+The natural reading is that the larger model is harder. That reading is wrong, and
+`src/qwen_j_lens/nla/capacity.py` exists to show why. It measures three things the
+original metric leaves implicit. The first is a pair of trivial baselines. Relative
+error divides by the mean squared norm of the target, so a zero predictor scores
+exactly 1.0 by construction and a constant mean predictor scores 0.950 on this
+sample. Any code that does not beat 0.950 has learned less than a single fixed
+vector. The trained code scored 1.008, so it learned nothing at all.
+
+The second is a sweep over activation-row count on one fixed activation matrix, with
+model, layer, and every hyperparameter held constant. The only variable is how many
+rows the code has to cover.
+
+| Activation rows | Relative error | Distinct codes used |
+| --- | --- | --- |
+| 64 | 0.0147 | 4 |
+| 128 | 1.0077 | 2 |
+| 256 | 1.0021 | 4 |
+| 1024 | 1.0029 | 8 |
+| 4096 | 1.0071 | 1 |
+| 16384 | 1.0064 | 4 |
+| 39697 | 1.0084 | 1 |
+
+At sixty-four rows the same 8B activations reproduce the development-scale result of
+near-zero error. At every larger count the error returns to the trivial baseline.
+The low number was never a property of the model or of the method. It was a property
+of the sample size, because sixty-four rows drawn from a handful of prompts are
+close enough to one another that four codes cover them.
+
+The third diagnostic explains why the codes never help. The bottleneck has four
+slots over a vocabulary of sixty-four symbols, so 16,777,216 codes are available.
+The trained bottleneck used between one and eight of them at every row count. It had
+collapsed. Sweeping the entropy bonus that opposes collapse, across 0.01, 0.1, 0.5,
+and 2.0, moved the best relative error only to 1.003, still short of the 0.950 that a
+constant vector achieves.
+
+The honest conclusion is that a discrete code of four slots over sixty-four symbols
+carries at most twenty-four bits, and twenty-four bits do not preserve a
+4096-dimensional residual stream. The development-scale reconstruction error of 0.006
+measured redundancy in a tiny activation sample rather than faithful compression, and
+reporting it without the row-count control would have been a mistake. This correction
+matters more than the original number did, because it changes what the metric is
+evidence for. It also strengthens rather than weakens the earlier cross-method
+finding, since the concepts fell in the neither quadrant at both scales, and the
+publication-scale run now shows that the autoencoder side of that comparison was
+never carrying information to begin with.
+
+Two limits bound the correction. The sweep varies the sample and the entropy bonus
+but holds the architecture fixed, so it shows this bottleneck fails at this width
+rather than that no discrete code can succeed. The 8B J-lens and autoencoder
+publication runs at the preregistered layer remain separate pending jobs, so this
+result speaks to the cross-method study alone.
+
+The remaining step is accelerator execution for the two single-method publication
+runs. The 8B primary estimate splits into ten checksum-validated shards at layer 24
+followed by one dual-lens evaluation, and the autoencoder path collects activations
+at the same layer, trains the verbalizer and reconstructor, and writes the
+faithfulness audit. The cross-method study has now run at 8B and is reported above.
+Until the two single-method 8B artifacts exist, those claims stay a reproducible
+experiment plan with tested local components, a verified 4B development run, and a
+publication-scale cross-method result, not a reproduced publication result.
 
 Expected publication locations, not yet live:
 

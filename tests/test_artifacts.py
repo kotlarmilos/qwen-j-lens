@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 
@@ -39,4 +40,39 @@ def test_repository_manifest_separates_tested_and_pending() -> None:
     assert len(manifest["pending_qwen_experiments"]) == 4
     methods = {entry["method"] for entry in manifest["pending_qwen_experiments"]}
     assert methods == {"j-lens", "natural-language-autoencoder"}
-    assert "No Qwen experiment results" in manifest["claim_status"]
+    assert "pending" in manifest["claim_status"]
+    assert "not publication measurements" in manifest["claim_status"]
+
+
+def test_publication_runs_declare_a_finding_and_a_caveat() -> None:
+    """Every publication-scale run must state what it shows and what bounds it."""
+    manifest = json.loads(
+        open("artifacts/manifest.json", encoding="utf-8").read()
+    )
+
+    runs = manifest["publication_scale_runs"]["runs"]
+
+    assert runs
+    for run in runs:
+        assert run["finding"].strip()
+        assert run["caveat"].strip()
+        assert Path(run["artifact_dir"]).is_dir()
+        assert Path(run["records"]).is_file()
+
+
+def test_capacity_run_records_a_trivial_predictor_baseline() -> None:
+    """The capacity diagnostic is only meaningful next to its baselines."""
+    manifest = json.loads(
+        open("artifacts/manifest.json", encoding="utf-8").read()
+    )
+
+    capacity = next(
+        run
+        for run in manifest["publication_scale_runs"]["runs"]
+        if run["method"] == "autoencoder-capacity-diagnostic"
+    )
+
+    assert capacity["baselines"]["zero_predictor"] == 1.0
+    assert 0.0 < capacity["baselines"]["mean_predictor"] < 1.0
+    assert capacity["beats_mean_predictor"] is False
+    assert capacity["row_count_sweep"]

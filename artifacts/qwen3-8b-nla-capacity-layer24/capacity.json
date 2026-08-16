@@ -1,0 +1,107 @@
+{
+  "activation_rows": 39697,
+  "available_codes": 16777216,
+  "baselines": {
+    "constant_energy_fraction": 0.049627840518951416,
+    "mean_predictor": 0.9503721594810486,
+    "zero_predictor": 1.0
+  },
+  "beats_mean_predictor": false,
+  "best_entropy_weight": {
+    "code_entropy": 0.34187260270118713,
+    "distinct_codes": 4,
+    "entropy_weight": 0.5,
+    "relative_error": 1.0027300119400024,
+    "rows": 39697
+  },
+  "entropy_weight_sweep": [
+    {
+      "code_entropy": 1.3055656609139987e-06,
+      "distinct_codes": 1,
+      "entropy_weight": 0.01,
+      "relative_error": 1.008370280265808,
+      "rows": 39697
+    },
+    {
+      "code_entropy": 0.3397410213947296,
+      "distinct_codes": 4,
+      "entropy_weight": 0.1,
+      "relative_error": 1.0048962831497192,
+      "rows": 39697
+    },
+    {
+      "code_entropy": 0.34187260270118713,
+      "distinct_codes": 4,
+      "entropy_weight": 0.5,
+      "relative_error": 1.0027300119400024,
+      "rows": 39697
+    },
+    {
+      "code_entropy": 0.3456861972808838,
+      "distinct_codes": 4,
+      "entropy_weight": 2.0,
+      "relative_error": 1.010794997215271,
+      "rows": 39697
+    }
+  ],
+  "hardware": "NVIDIA RTX A6000",
+  "hidden_size": 4096,
+  "hidden_state_index": 25,
+  "max_prompts": 256,
+  "method": "capacity diagnostics for the discrete autoencoder code: trivial predictor baselines, an activation-row sweep at fixed hyperparameters, and an entropy-bonus sweep with code occupancy",
+  "model_id": "Qwen/Qwen3-8B",
+  "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+  "row_count_sweep": [
+    {
+      "code_entropy": 0.24051761627197266,
+      "distinct_codes": 4,
+      "entropy_weight": 0.01,
+      "relative_error": 0.01466895267367363,
+      "rows": 64
+    },
+    {
+      "code_entropy": 0.0863029807806015,
+      "distinct_codes": 2,
+      "entropy_weight": 0.01,
+      "relative_error": 1.0077325105667114,
+      "rows": 128
+    },
+    {
+      "code_entropy": 0.14652793109416962,
+      "distinct_codes": 4,
+      "entropy_weight": 0.01,
+      "relative_error": 1.0020732879638672,
+      "rows": 256
+    },
+    {
+      "code_entropy": 0.36443012952804565,
+      "distinct_codes": 8,
+      "entropy_weight": 0.01,
+      "relative_error": 1.0028761625289917,
+      "rows": 1024
+    },
+    {
+      "code_entropy": 1.3055657746008364e-06,
+      "distinct_codes": 1,
+      "entropy_weight": 0.01,
+      "relative_error": 1.0070722103118896,
+      "rows": 4096
+    },
+    {
+      "code_entropy": 0.040728457272052765,
+      "distinct_codes": 4,
+      "entropy_weight": 0.01,
+      "relative_error": 1.006388783454895,
+      "rows": 16384
+    },
+    {
+      "code_entropy": 1.3055656609139987e-06,
+      "distinct_codes": 1,
+      "entropy_weight": 0.01,
+      "relative_error": 1.008370280265808,
+      "rows": 39697
+    }
+  ],
+  "source_config": "configs/cross-8b-publication.toml",
+  "torch_version": "2.6.0+cu124"
+}
