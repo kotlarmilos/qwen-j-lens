@@ -1,0 +1,266 @@
+---
+title: "Reading a residual stream two ways: J-lens and Natural Language Autoencoders"
+thumbnail: /blog/assets/jlens-vs-nla/thumbnail.png
+authors:
+- user: kotlarmilos
+---
+
+# Reading a residual stream two ways: J-lens and Natural Language Autoencoders
+
+## TL;DR
+
+I want to know what a hidden activation in a language model means, and I want a
+method that tells me when my answer is wrong. This repository studies two ways to
+read the residual stream of an open-weight model and holds both to the same
+standard. The first is Anthropic's J-lens, which reads an activation as a set of
+directions the model itself uses to write tokens. The second is Anthropic's Natural
+Language Autoencoder, which verbalizes an activation into text and then checks
+whether that text carries the activation back. The two methods answer different
+questions, and comparing them is the point of this project.
+
+## The problem
+
+The important word is experiment. I have built and tested the machinery for both
+methods against a tiny local transformer. I have not run the open-weight Qwen study
+yet. There are no reproduction numbers hiding in this repository, and I will not
+fill that gap with screenshots from an incomplete pilot. A transformer carries
+information forward through its residual stream. Pick an activation at layer `l` and
+token position `t`. Both methods take that vector as their subject. They disagree
+about how to turn it into something a person can read.
+
+## Intuition
+
+### The J-lens reads in output coordinates
+
+A J-lens reads the activation in the model's own output coordinates. A small change
+to the activation can affect the final residual state before the final RMSNorm at
+every later position `t'`. The local first-order map is a Jacobian. The paper
+averages that map across source positions, future target positions, and a broad
+corpus of prompts. A high score says that an activation is aligned with a direction
+that tends to make the model emit that token across contexts and future positions.
+
+### The logit lens stays in the room
+
+The logit lens applies final normalization and unembedding directly at an
+intermediate layer. It is the special case where the Jacobian is the identity. That
+shortcut is useful because residual connections keep coordinate systems somewhat
+aligned, especially near the output. It is also exactly why the logit lens is a good
+baseline rather than a substitute. Earlier layers can use representations that
+downstream blocks rotate, gate, or otherwise transform before unembedding. The
+J-lens estimates that downstream linearized transformation instead of assuming it
+away. Every Qwen result therefore needs a layer-matched logit-lens comparison.
+
+### The autoencoder verbalizes instead of projecting
+
+The Natural Language Autoencoder asks a different question. It does not read the
+activation in output coordinates. It writes a natural-language description of the
+activation and then checks whether the description is enough to rebuild the
+activation. A verbalizer turns an activation into text. A reconstructor turns that
+text back into an activation. When the round trip returns to where it started, the
+text is treated as a faithful explanation of what the activation carried. Text is
+the bottleneck code. A description that omits what the activation encoded cannot
+drive the reconstructor back to the original vector, so reconstruction error becomes
+a measurable proxy for how much the description left out.
+
+## The math
+
+### The J-lens Jacobian and readout
+
+The averaged Jacobian is
+
+`J_l = E[d h_final_pre_norm[t'] / d h_l[t]]` for `t' >= t`
+
+A Jacobian from one prompt mixes a general disposition to verbalize a concept with
+whatever the model happens to be doing in that prompt. A corpus average is intended
+to preserve the general disposition and wash out context-specific routing. After the
+average map, the model's own final normalization and unembedding turn an
+intermediate activation into token scores.
+
+`lens(h_l) = softmax(W_U norm(J_l h_l))`
+
+The token-indexed J-lens directions are the rows of `W_U J_l`. RMSNorm is not inside
+that Jacobian or those vectors. It is applied after `J_l h_l` when the lens produces
+a readout.
+
+A full hidden-width by hidden-width Jacobian is straightforward on the toy model and
+wasteful on a four or eight billion parameter model when the experiment controls
+only thirteen token directions. The Qwen path computes selected-token VJPs instead.
+Each batched VJP starts from the declared unembedding rows applied to the final
+pre-normalization residual and differentiates those scores with respect to the
+selected layer activation. This produces the required rows of `W_U J_l` directly
+without storing the hidden-width square matrix. The estimator averages every valid
+source and target pair with equal weight, then averages across calibration prompts.
+
+### The autoencoder round trip
+
+`h_l  ->  verbalizer  ->  text code  ->  reconstructor  ->  h_hat_l`
+
+The offline machinery replaces the text code with a short sequence of discrete
+symbols over a fixed vocabulary. Each symbol stands in for a word that a
+language-model verbalizer would emit. The verbalizer is a small network from the
+activation to per-slot symbol logits. A straight-through argmax makes the code
+discrete on the forward pass while still passing gradients to the verbalizer on the
+backward pass. The reconstructor embeds the symbols and maps them back to the
+residual width. On an accelerator the verbalizer becomes an actual text decoder and
+the code becomes real words, and the structure carried by the tests here transfers
+without change.
+
+### Reconstruction is necessary, not sufficient
+
+The critique paper, *Train the Model, Not the Reader*, shows two ways a
+high-reconstruction code can still mislead a human reader, and this repository
+implements an audit for each. The first failure is a co-adapted private code. The
+verbalizer and reconstructor can agree on a scheme that reconstructs well and yet
+means nothing to anyone who did not train alongside them. The audit trains a second
+reconstructor, an independent reader, on a held-out split of the same codes and
+scores it on examples it never saw during training. When the code is a generalizable
+description the gap is small. When the code is an example-specific private scheme the
+gap grows. The gap, not the raw reconstruction error, is the faithfulness signal.
+The second failure is a gist code. The audit fits a linear probe for a labeled
+attribute on the original activations and again on the reconstructions. When the
+reconstruction keeps only the gist the probe on reconstructions falls while the
+probe on originals stays high. A third measurement reports how the code population
+uses its vocabulary, because a code that assigns a distinct symbol string to every
+example is memorizing rather than describing.
+
+## In the code
+
+The J-lens VJP estimator lives in `src/qwen_j_lens/jacobian.py`, the logit-lens
+baseline in `src/qwen_j_lens/logit_lens.py`, activation capture in
+`src/qwen_j_lens/capture.py`, the paired interventions in
+`src/qwen_j_lens/interventions.py`, and the evaluation protocol in
+`src/qwen_j_lens/evaluation.py`. The open-weight adapter and the Qwen loader live in
+`src/qwen_j_lens/adapter.py` and `src/qwen_j_lens/qwen.py`. The autoencoder modules
+live under `src/qwen_j_lens/nla/`. Activation collection is in `activations.py`, the
+verbalizer, reconstructor, and straight-through code in `autoencoder.py`,
+deterministic training in `train.py`, and the two faithfulness audits in
+`faithfulness.py`. The J-lens command line is `src/qwen_j_lens/cli.py` and the
+autoencoder command line is `src/qwen_j_lens/nla_cli.py`. `LEARNING.md` derives the
+VJP method and the autoencoder audits from first principles with exact line
+references.
+
+The evaluation registers four workspace properties from the paper as paired causal
+tests. Verbal report asks whether a concept present in J-space predicts what the
+model reports and whether swapping concept coordinates redirects the report.
+Directed modulation asks whether an instruction to hold a concept in mind raises
+that concept's J-lens activation while surface output remains occupied with another
+task. Internal reasoning asks whether intermediate answers appear before the final
+response and whether targeted swaps or controlled-subset ablation redirect the
+conclusion. Selectivity asks whether the same intervention damages deliberate
+reasoning more than routine copying, grammar, and basic fluency. Each needs an
+untreated baseline, a targeted intervention, matched controls, fixed seeds, raw
+generations, and effect sizes, and each runs once with J-lens directions and once
+with layer-matched logit-lens directions. Keyword scores help with triage, but
+manual review remains necessary.
+
+## Results and honesty boundary
+
+The paper treats a broad vocabulary bank of J-lens directions as a sparse frame and
+calls the active region J-space. This repository estimates only thirteen declared
+directions, so it supports controlled-subset projection, ablation, steering, and
+coordinate swaps, and it cannot support vocabulary-wide occupancy or top-k J-space
+claims. Token strings, token IDs, layer indices, pair counts, model identifiers,
+seeds, and array hashes all travel with the artifact. A token that does not encode
+to exactly one Qwen vocabulary entry fails validation instead of silently changing
+the question.
+
+The local tests cover both methods and nothing about Qwen behavior. For the J-lens
+they cover capture hooks, gradient shapes, exact averaging on an analytic toy model,
+projection algebra, coordinate swaps, deterministic serialization, and offline model
+errors. For the autoencoder they cover activation collection, the straight-through
+code, deterministic training that lowers reconstruction error on a clustered
+dataset, and the two faithfulness audits on constructed data where the right answer
+is known. The independent-reader gap is exercised on memorized codes, where it must
+open, and on generalizable cluster codes, where it must stay closed. The gist probe
+is exercised on a reconstruction that destroys a specific attribute and on one that
+preserves it.
+
+Running both methods on the same preregistered layer 24 of the same open-weight
+model is what makes the comparison possible. A concept that is present as a clean
+J-lens direction and also survives the reconstruction round trip is a strong result.
+A concept that shows up in one method and not the other is the more instructive case,
+because it tells me whether the information is written in output coordinates,
+carried in a form only a description can capture, or an artifact of one method's
+machinery.
+
+The artifact manifest makes the boundary machine-readable. The Space reads uploaded
+artifacts only. It recursively parses record files, requires their referenced
+arrays, and verifies every SHA-256 value. When any Qwen array or audit summary is
+absent or corrupt, it displays no result. Neither method here can establish
+subjective experience. The J-lens paper is careful to separate functional access
+from phenomenal consciousness, and an open-weight replication should preserve that
+distinction for both methods.
+
+A development-scale run on the real `Qwen3-4B-Instruct-2507` weights now exists. It
+ran on a single Apple Silicon machine, resident on CPU in bfloat16, fully offline
+against the local Hugging Face cache. The J-lens estimate produced thirteen
+controlled-token directions of width 2560 at layer 24 from two calibration prompts
+and 291 position pairs. The layer-24 evaluation generated real continuations under
+both the Jacobian lens and the logit lens and recorded small development-scale
+causal effects, which is the honest outcome for directions estimated from only two
+prompts. The autoencoder produced a reconstruction error of 0.023 and an
+independent-reader gap of 0.0023 over 128 layer-18 activation rows. These artifacts
+live under `local_development_runs` in the manifest and are labeled as
+development-scale, not publication measurements. They demonstrate that the pipeline
+runs end to end on the real model, and they do not stand in for a corpus-scale
+J-space estimate or a preregistered 8B comparison.
+
+A cross-method extension now measures something neither source paper reports,
+whether the two methods agree on which concepts they recover from the same physical
+residual stream. The J-lens and the autoencoder read different indices of the
+hidden-state stack by default, so the runner aligns them. It captures the J-lens
+directions at block 17 and reads the autoencoder activations at hidden state 18,
+which are the same residual stream, and it scores both from the same four
+calibration prompts. For each concept the ground truth is the model's own
+next-token logit at every attended position. The J-lens fidelity is the held-out
+coefficient of determination of that logit from the single stored direction. The
+autoencoder retention is the fraction of that logit's linear recoverability that
+survives the reconstruction, reusing the gist probe the faithfulness module already
+defines. This is the difference between reproducing a paper and extending one,
+because the matched-layer agreement question is only askable once both methods run
+on the same open-weight residual stream.
+
+The measured outcome is a clean negative result. Across sixty-four activation rows,
+thirty-two of them held out over 547 position pairs, all thirteen controlled
+concepts fall in the neither quadrant at the 0.5 thresholds. The autoencoder
+reconstructs the residual with an error of 0.006 and still retains almost none of
+any concept's next-token logit, which is the gist-code signature the faithfulness
+audit was built to detect, now shown on the real weights across the whole concept
+bank. The single J-lens direction, read without the final normalization, predicts
+the model's own next-token logit weakly at this scale. The lesson is that a low
+reconstruction error does not imply concept faithfulness, and that a clean linear
+direction and a discrete description can both miss the specific attribute a residual
+carries.
+
+Two honesty limits bound this result. The J-lens fidelity uses one stored direction
+with no final normalization while the autoencoder retention uses a multivariate
+probe, so the two axes differ in absolute scale and only their per-concept ordering
+is directly comparable. The agreement statistics, a Spearman rank correlation of
+0.53 and a Pearson correlation of 0.91, come from thirteen concepts and thirty-two
+held-out rows, and the Pearson value is dominated by a single concept, so both are
+development-scale signals rather than publication measurements. The comparison still
+earns its place because even this negative result separates reconstruction quality
+from concept faithfulness in a way that neither method shows alone.
+
+The remaining step is accelerator execution at publication scale. The 8B primary
+estimate splits into ten checksum-validated shards at layer 24 followed by one
+dual-lens evaluation, and the autoencoder path collects activations at the same
+layer, trains the verbalizer and reconstructor, and writes the faithfulness audit.
+Until the 8B artifacts exist, the publication claim stays a reproducible experiment
+plan with tested local components and a verified 4B development run, not a
+reproduced publication result.
+
+Expected publication locations, not yet live:
+
+- [GitHub repository](https://github.com/kotlarmilos/qwen-j-lens)
+- [Hugging Face model](https://huggingface.co/kotlarmilos/qwen-j-lens)
+- [Hugging Face dataset](https://huggingface.co/datasets/kotlarmilos/qwen-j-lens-evaluation)
+- [Hugging Face Space](https://huggingface.co/spaces/kotlarmilos/qwen-j-lens)
+
+## References
+
+- Anthropic, [Functional workspace and the J-lens](https://transformer-circuits.pub/2026/workspace/index.html)
+- Anthropic, [Natural Language Autoencoders](https://transformer-circuits.pub/2026/nla/index.html)
+- Anthropic, [Natural language autoencoders research page](https://www.anthropic.com/research/natural-language-autoencoders)
+- [Reference natural language autoencoder implementation](https://github.com/kitft/natural_language_autoencoders)
+- *Train the Model, Not the Reader*, [arXiv:2607.20379](https://arxiv.org/abs/2607.20379)
