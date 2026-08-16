@@ -216,10 +216,18 @@ def collect_activation_signals(
         selected_hidden = hidden[mask]
         selected_logits = concept_logits[mask]
         if selected_hidden.numel() > 0:
-            activation_rows.append(selected_hidden.detach().to(dtype=torch.float32))
-            logit_rows.append(selected_logits.detach().to(dtype=torch.float32))
+            activation_rows.append(
+                selected_hidden.detach().to(device="cpu", dtype=torch.float32)
+            )
+            logit_rows.append(
+                selected_logits.detach().to(device="cpu", dtype=torch.float32)
+            )
     if not activation_rows:
         raise ValueError("No attended positions were found across the batches")
+    # Rows move to CPU so the downstream autoencoder training and agreement
+    # scoring run on one device regardless of where the model is resident. The
+    # autoencoder draws batches from a CPU generator, so keeping the analysis on
+    # CPU also keeps an accelerator run comparable with a CPU run.
     return torch.cat(activation_rows, dim=0), torch.cat(logit_rows, dim=0)
 
 
@@ -458,7 +466,7 @@ def execute_cross_method(
         include_future=config.include_future,
         vjp_chunk_size=config.vjp_chunk_size,
     )
-    lens_vectors = estimate.values.to(torch.float32)
+    lens_vectors = estimate.values.to(device="cpu", dtype=torch.float32)
 
     activations, concept_logits = collect_activation_signals(
         adapter,
