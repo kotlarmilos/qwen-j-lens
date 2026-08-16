@@ -1,0 +1,162 @@
+{
+  "artifact_schema_version": 2,
+  "claim_status": "No Qwen experiment results are included in the publication artifact set. Local development-scale Qwen3-4B runs are recorded under local_development_runs and are explicitly not publication measurements.",
+  "locally_tested": {
+    "scope": [
+      "layer capture on a tiny local transformer",
+      "selected-token VJPs and equivalence with the toy full Jacobian",
+      "pre-normalization residual W_U J_l row shapes",
+      "corpus and position-pair averaging",
+      "post-Jacobian final-normalization lens readout",
+      "raw calibration and chat-template evaluation tokenization separation",
+      "single-token validation against both pinned Qwen revisions",
+      "controlled-subset projection, ablation, steering, and coordinate swap",
+      "incremental KV-cached activation trajectories and preregistered step scoring",
+      "layer-matched Jacobian-lens and logit-lens evaluation records",
+      "absolute target and control damage selectivity metrics",
+      "deterministic JSON and NPY artifact storage",
+      "checksum-validated estimate-shard merging with contiguous coverage",
+      "recursive artifact reference and SHA-256 validation",
+      "offline missing-model errors",
+      "residual activation collection for the natural-language autoencoder",
+      "straight-through discrete code with gradient flow",
+      "deterministic autoencoder training that lowers reconstruction error",
+      "independent-reader faithfulness gap on memorized and generalizable codes",
+      "gist-versus-specific linear probe on destroyed and preserved attributes",
+      "code-usage summary distinguishing memorized from clustered codes",
+      "offline end-to-end autoencoder artifact pipeline on the toy adapter"
+    ],
+    "model": "tests.toy.ToyAdapter",
+    "network_required": false
+  },
+  "pending_qwen_experiments": [
+    {
+      "config": "configs/smoke.toml",
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "method": "j-lens",
+      "status": "local development run complete on CPU (configs/local-4b-dev.toml, layer 24, 2 calibration prompts); publication run pending accelerator"
+    },
+    {
+      "config": "configs/qwen-publication.toml",
+      "model_id": "Qwen/Qwen3-8B",
+      "method": "j-lens",
+      "status": "pending accelerator run"
+    },
+    {
+      "config": "configs/nla-smoke.toml",
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "method": "natural-language-autoencoder",
+      "status": "local development run complete on CPU (configs/local-4b-nla-dev.toml, layer 18, 8 corpus prompts); publication run pending accelerator"
+    },
+    {
+      "config": "configs/nla-publication.toml",
+      "model_id": "Qwen/Qwen3-8B",
+      "method": "natural-language-autoencoder",
+      "status": "pending accelerator run"
+    }
+  ],
+  "publication_calibration": {
+    "contexts": 1000,
+    "dataset": "Salesforce/wikitext",
+    "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+    "subset": "wikitext-2-raw-v1",
+    "corpus_sha256": "7919f2c32e2fa0da9ab79690b00844d5d7ce6d52f76a2c8ca6dc010e8b891e3",
+    "primary_layer": 24,
+    "estimation_shards": 10
+  },
+  "required_uploaded_artifacts": [
+    "qwen3-4b-development/records.json",
+    "qwen3-8b-primary-publication/records.json",
+    "evaluation/records.json",
+    "evaluation/results.jsonl",
+    "evaluation/summary.json",
+    "nla-qwen3-4b/records.json",
+    "nla-qwen3-8b/records.json",
+    "nla-qwen3-8b/faithfulness.json"
+  ],
+  "local_development_runs": {
+    "scope": "development-scale local runs on the real Qwen3-4B-Instruct-2507 weights, not publication measurements",
+    "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+    "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "hardware": "Apple Silicon (arm64) CPU, 16 GiB unified memory, macOS. No CUDA. Model loaded fully resident on CPU (device_map omitted) in bfloat16.",
+    "network_required": false,
+    "runs": [
+      {
+        "name": "qwen3-4b-local-development",
+        "method": "j-lens",
+        "stage": "estimate",
+        "config": "configs/local-4b-dev.toml",
+        "layer": 24,
+        "calibration_prompts": 2,
+        "controlled_tokens": 13,
+        "vector_shape": [
+          13,
+          2560
+        ],
+        "context_count": 2,
+        "pair_count": 291,
+        "artifact_dir": "artifacts/qwen3-4b-dev-lens-layer24",
+        "records": "artifacts/qwen3-4b-dev-lens-layer24/records.json",
+        "records_sha256": "0ae2da609bd7d48c2e7ae4d5b556ac786774a1dd86bd96d6cb0bc7b8322ee471"
+      },
+      {
+        "name": "qwen3-4b-local-development",
+        "method": "j-lens",
+        "stage": "evaluate",
+        "config": "configs/local-4b-dev.toml",
+        "layer": 24,
+        "max_new_tokens": 24,
+        "lenses": [
+          "jacobian",
+          "logit"
+        ],
+        "artifact_dir": "artifacts/qwen3-4b-dev-eval-layer24",
+        "records": "artifacts/qwen3-4b-dev-eval-layer24/records.json",
+        "records_sha256": "f2138b498d554f09e351c651428f960fb15893e5f537b6e23dd9d09df102131d"
+      },
+      {
+        "name": "qwen3-4b-nla-local-development",
+        "method": "natural-language-autoencoder",
+        "stage": "nla-run",
+        "config": "configs/local-4b-nla-dev.toml",
+        "layer": 18,
+        "activation_rows": 128,
+        "train_steps": 600,
+        "reconstruction_error": 0.023007525131106377,
+        "independent_reader_gap": 0.002312730997800827,
+        "artifact_dir": "artifacts/qwen3-4b-nla-dev-layer18",
+        "records": "artifacts/qwen3-4b-nla-dev-layer18/records.json",
+        "records_sha256": "3af824c41e61b558fa1ab01a73d1913d1ca7f45c4f1c8e4c9ef120e7a731f8b0"
+      },
+      {
+        "name": "qwen3-4b-cross-method-development",
+        "method": "cross-method-agreement",
+        "stage": "cross-run",
+        "config": "configs/cross-4b-dev.toml",
+        "hidden_state_index": 18,
+        "jlens_capture_layer": 17,
+        "calibration_prompts": 4,
+        "controlled_tokens": 13,
+        "activation_rows": 64,
+        "context_count": 4,
+        "pair_count": 547,
+        "reconstruction_error": 0.0062165590934455395,
+        "mean_jlens_fidelity": 0.006407421368819017,
+        "mean_nla_retention": 0.014428318067345404,
+        "spearman_rho": 0.5277986629117476,
+        "pearson_r": 0.9056961877932378,
+        "quadrant_counts": {
+          "both_recoverable": 0,
+          "jlens_only": 0,
+          "nla_only": 0,
+          "neither": 13
+        },
+        "finding": "At a matched mid-stack residual layer and development scale, both methods place all thirteen controlled concepts in the neither quadrant. The autoencoder reconstructs the residual with error 0.006 yet retains almost none of each concept next-token logit, a gist-code signature. The single-direction J-lens readout without the final norm is a weak predictor at this scale. Reconstruction quality does not imply concept faithfulness.",
+        "caveat": "The J-lens fidelity uses one stored direction with no final normalization while the autoencoder retention uses a multivariate probe, so the two axes differ in absolute scale. The agreement statistics are computed over thirteen concepts with thirty-two held-out rows and are development-scale only.",
+        "artifact_dir": "artifacts/qwen3-4b-cross-method-layer18",
+        "records": "artifacts/qwen3-4b-cross-method-layer18/records.json",
+        "records_sha256": "5373245969d80bc89b6843c14631c82b1511c994beebbb99cb2926b20834501b"
+      }
+    ]
+  }
+}
