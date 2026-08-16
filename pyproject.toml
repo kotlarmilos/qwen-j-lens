@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qwen-j-lens"
+version = "0.1.0rc1"
+description = "Offline-first tools for testing J-lens workspace properties on open-weight Qwen models"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Milos Kotlar" }]
+dependencies = [
+  "numpy>=1.26",
+  "torch>=2.2",
+]
+
+[project.urls]
+Repository = "https://github.com/kotlarmilos/qwen-j-lens"
+Article = "https://github.com/kotlarmilos/qwen-j-lens/blob/main/article.md"
+Artifacts = "https://huggingface.co/kotlarmilos/qwen-j-lens"
+Dataset = "https://huggingface.co/datasets/kotlarmilos/qwen-j-lens-evaluation"
+Space = "https://huggingface.co/spaces/kotlarmilos/qwen-j-lens"
+
+[project.optional-dependencies]
+qwen = [
+  "accelerate>=1.2",
+  "safetensors>=0.4",
+  "transformers>=4.51",
+]
+data = ["datasets>=3.2,<5"]
+space = ["gradio>=5.0"]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+qwen-j-lens = "qwen_j_lens.cli:main"
+qwen-nla = "qwen_j_lens.nla_cli:main"
+qwen-cross = "qwen_j_lens.cross_method:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qwen_j_lens"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
