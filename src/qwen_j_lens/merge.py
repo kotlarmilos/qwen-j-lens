@@ -152,7 +152,7 @@ def merge_estimate_shards(
             ],
             "model_id": config.model.model_id,
             "model_revision": config.model.revision,
-            "source": source,
+            "source_code": source,
             "prompt_shard": {
                 "count": expected_offset,
                 "offset": 0,

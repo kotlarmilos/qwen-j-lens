@@ -173,7 +173,7 @@ def run_estimation(
                 },
                 "model_id": adapter.model_id,
                 "model_revision": config.model.revision,
-                "source": source,
+                "source_code": source,
                 "prompt_shard": {
                     "offset": prompt_offset,
                     "count": len(prompts),
@@ -377,7 +377,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "model_revision": config.model.revision,
                 "layer": layer_index,
                 "jacobian_vectors": portable_path(args.lens_vectors),
-                "source": source,
+                "source_code": source,
                 "baselines": ["jacobian", "logit"],
                 "enable_thinking": config.model.enable_thinking,
                 "kv_cache": True,

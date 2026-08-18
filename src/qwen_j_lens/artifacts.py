@@ -41,7 +41,7 @@ def capture_source_state() -> dict[str, str]:
             text=True,
         ).stdout.strip()
         status = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],
+            ["git", "status", "--porcelain"],
             check=True,
             capture_output=True,
             text=True,

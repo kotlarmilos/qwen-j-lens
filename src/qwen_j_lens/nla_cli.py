@@ -208,7 +208,7 @@ def execute_nla(
                 "faithfulness": asdict(config.faithfulness),
             },
             "model_id": adapter.model_id,
-            "source": source,
+            "source_code": source,
             "activation_rows": int(activations.shape[0]),
             "specific_targets": (
                 None if specific_targets is None else portable_path(specific_targets)

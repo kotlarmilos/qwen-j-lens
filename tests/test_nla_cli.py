@@ -80,6 +80,9 @@ def test_execute_nla_writes_deterministic_artifacts(tmp_path: Path) -> None:
 
     faithfulness = json.loads((output / "faithfulness.json").read_text())
     assert "independent_reader" in faithfulness
+    run = json.loads((output / "run.json").read_text())
+    assert set(run["source_code"]) == {"git_revision", "git_status"}
+    assert run["source"] == "https://transformer-circuits.pub/2026/nla/index.html"
     assert "gap" in faithfulness["independent_reader"]
     assert "code_usage" in faithfulness
 

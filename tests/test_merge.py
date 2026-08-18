@@ -66,3 +66,4 @@ def test_merge_estimate_shards_uses_context_weighting(tmp_path: Path) -> None:
     run = json.loads((output / "run.json").read_text(encoding="utf-8"))
     assert run["layers"][0]["context_count"] == 8
     assert run["layers"][0]["pair_count"] == 80
+    assert set(run["source_code"]) == {"git_revision", "git_status"}
