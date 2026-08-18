@@ -41,7 +41,7 @@ import torch
 from torch import Tensor
 
 from qwen_j_lens.adapter import ModelAdapter
-from qwen_j_lens.artifacts import ArtifactStore
+from qwen_j_lens.artifacts import ArtifactStore, portable_path
 from qwen_j_lens.jacobian import estimate_token_vjps
 from qwen_j_lens.nla.activations import ActivationBatch
 from qwen_j_lens.nla.config import NLAAutoencoderConfig, NLAModelConfig, NLATrainConfig
@@ -524,7 +524,7 @@ def execute_cross_method(
                 "model": asdict(config.model),
                 "hidden_state_index": config.hidden_state_index,
                 "jlens_capture_layer": capture_layer,
-                "corpus_path": str(config.corpus_path),
+                "corpus_path": portable_path(config.corpus_path),
                 "max_prompts": config.max_prompts,
                 "batch_size": config.batch_size,
                 "tokens": list(config.tokens),

@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from qwen_j_lens.adapter import ModelAdapter
-from qwen_j_lens.artifacts import ArtifactStore
+from qwen_j_lens.artifacts import ArtifactStore, portable_path
 from qwen_j_lens.nla.activations import ActivationBatch, collect_layer_activations
 from qwen_j_lens.nla.config import NLARunConfig, load_nla_config
 from qwen_j_lens.nla.faithfulness import (
@@ -196,7 +196,7 @@ def execute_nla(
                 "model": asdict(config.model),
                 "activations": {
                     **asdict(config.activations),
-                    "corpus_path": str(config.activations.corpus_path),
+                    "corpus_path": portable_path(config.activations.corpus_path),
                 },
                 "autoencoder": asdict(config.autoencoder),
                 "train": asdict(config.train),
@@ -204,7 +204,9 @@ def execute_nla(
             },
             "model_id": adapter.model_id,
             "activation_rows": int(activations.shape[0]),
-            "specific_targets": None if specific_targets is None else str(specific_targets),
+            "specific_targets": (
+                None if specific_targets is None else portable_path(specific_targets)
+            ),
             "method": (
                 "verbalize activations to a discrete code, reconstruct, and audit "
                 "faithfulness with an independent reader and a specific-attribute probe"

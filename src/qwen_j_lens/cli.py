@@ -12,7 +12,7 @@ from typing import Sequence
 import numpy as np
 import torch
 
-from qwen_j_lens.artifacts import ArtifactStore
+from qwen_j_lens.artifacts import ArtifactStore, portable_path
 from qwen_j_lens.config import RunConfig, load_config
 from qwen_j_lens.jacobian import estimate_token_vjps
 from qwen_j_lens.merge import merge_estimate_shards
@@ -155,11 +155,15 @@ def run_estimation(
                     "model": asdict(config.model),
                     "estimation": {
                         **asdict(config.estimation),
-                        "calibration_path": str(config.estimation.calibration_path),
+                        "calibration_path": portable_path(
+                            config.estimation.calibration_path
+                        ),
                     },
                     "evaluation": {
                         **asdict(config.evaluation),
-                        "prompts_path": str(config.evaluation.prompts_path),
+                        "prompts_path": portable_path(
+                            config.evaluation.prompts_path
+                        ),
                     },
                 },
                 "model_id": adapter.model_id,

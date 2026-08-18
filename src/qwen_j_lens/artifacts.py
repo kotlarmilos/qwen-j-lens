@@ -21,6 +21,15 @@ def canonical_json_bytes(value: object) -> bytes:
     )
 
 
+def portable_path(path: str | Path) -> str:
+    """Represent local artifact inputs without embedding the host workspace path."""
+    resolved = Path(path).resolve()
+    try:
+        return resolved.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return resolved.name
+
+
 @dataclass(frozen=True)
 class ArtifactRecord:
     path: str

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from qwen_j_lens.artifacts import ArtifactStore, canonical_json_bytes
+from qwen_j_lens.artifacts import ArtifactStore, canonical_json_bytes, portable_path
 
 
 def test_canonical_json_is_deterministic() -> None:
@@ -14,6 +14,14 @@ def test_canonical_json_is_deterministic() -> None:
 
     assert left == right
     assert left == b'{"a":{"q":true},"z":[2,1]}\n'
+
+
+def test_portable_path_does_not_embed_workspace_prefix(tmp_path: Path) -> None:
+    within_repository = Path.cwd() / "data" / "prompts.jsonl"
+    outside_repository = tmp_path / "private" / "prompts.jsonl"
+
+    assert portable_path(within_repository) == "data/prompts.jsonl"
+    assert portable_path(outside_repository) == "prompts.jsonl"
 
 
 def test_npy_storage_is_deterministic_and_verified(tmp_path) -> None:
