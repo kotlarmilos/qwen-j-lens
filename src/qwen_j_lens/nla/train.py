@@ -65,7 +65,7 @@ def train_autoencoder(
     if entropy_weight < 0.0:
         raise ValueError("entropy_weight must not be negative")
     torch.manual_seed(seed)
-    generator = torch.Generator().manual_seed(seed)
+    generator = torch.Generator(device=activations.device).manual_seed(seed)
     rows = activations.shape[0]
     effective_batch = min(batch_size, rows)
     model = NaturalLanguageAutoencoder(
@@ -75,11 +75,16 @@ def train_autoencoder(
         width=width,
         embedding_dim=embedding_dim,
         temperature=temperature,
-    )
+    ).to(activations.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     history: list[dict[str, float]] = []
     for step in range(steps):
-        indices = torch.randint(rows, (effective_batch,), generator=generator)
+        indices = torch.randint(
+            rows,
+            (effective_batch,),
+            generator=generator,
+            device=activations.device,
+        )
         batch = activations.index_select(0, indices)
         sample = model(batch)
         error = reconstruction_error(sample.reconstruction, batch, relative=True)

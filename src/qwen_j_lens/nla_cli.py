@@ -137,6 +137,8 @@ def execute_nla(
     train_index, test_index = _split_indices(
         activations.shape[0], config.faithfulness.test_fraction
     )
+    train_index = train_index.to(activations.device)
+    test_index = test_index.to(activations.device)
     gap = independent_reader_gap(
         codes,
         activations,
@@ -158,7 +160,8 @@ def execute_nla(
     }
     if specific_targets is not None:
         targets = torch.from_numpy(np.load(specific_targets, allow_pickle=False)).to(
-            dtype=torch.float32
+            device=activations.device,
+            dtype=torch.float32,
         )
         if targets.shape[0] != activations.shape[0]:
             raise ValueError("specific-targets rows must match the activation count")

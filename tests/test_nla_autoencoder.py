@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch
+import pytest
 
 from qwen_j_lens.nla.autoencoder import (
     NaturalLanguageAutoencoder,
@@ -71,6 +72,26 @@ def test_training_reduces_reconstruction_error_on_clusters() -> None:
 
     assert result.history[-1]["relative_error"] < result.history[0]["relative_error"]
     assert result.final_relative_error < 0.5
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
+def test_training_keeps_cuda_activations_and_model_on_one_device() -> None:
+    activations = torch.randn((16, 8), device="cuda")
+    result = train_autoencoder(
+        activations,
+        code_length=1,
+        code_vocab=4,
+        width=8,
+        embedding_dim=4,
+        temperature=1.0,
+        steps=2,
+        lr=0.01,
+        batch_size=8,
+        entropy_weight=0.01,
+        seed=5,
+    )
+
+    assert next(result.model.parameters()).device.type == "cuda"
 
 
 def test_reconstruction_error_relative_reference() -> None:

@@ -27,7 +27,7 @@ def _one_hot(codes: Tensor, code_vocab: int) -> Tensor:
     if int(codes.max()) >= code_vocab or int(codes.min()) < 0:
         raise ValueError("Code indices fall outside the declared vocabulary")
     return torch.zeros(
-        (*codes.shape, code_vocab), dtype=torch.float32
+        (*codes.shape, code_vocab), dtype=torch.float32, device=codes.device
     ).scatter_(-1, codes.unsqueeze(-1), 1.0)
 
 
@@ -49,7 +49,7 @@ def _train_reader(
         code_vocab=code_onehot.shape[2],
         width=width,
         embedding_dim=embedding_dim,
-    )
+    ).to(targets.device)
     optimizer = torch.optim.Adam(reader.parameters(), lr=lr)
     for _ in range(steps):
         prediction = reader(code_onehot)
@@ -83,6 +83,8 @@ def independent_reader_gap(
     the gap grows.
     """
     code_onehot = _one_hot(codes, code_vocab)
+    train_index = train_index.to(activations.device)
+    test_index = test_index.to(activations.device)
     train_targets = activations.index_select(0, train_index)
     test_targets = activations.index_select(0, test_index)
     train_codes = code_onehot.index_select(0, train_index)
@@ -127,8 +129,16 @@ def _linear_probe_r2(
     targets_test: Tensor,
 ) -> float:
     """Coefficient of determination for a least-squares linear probe."""
-    ones_train = torch.ones((inputs_train.shape[0], 1))
-    ones_test = torch.ones((inputs_test.shape[0], 1))
+    ones_train = torch.ones(
+        (inputs_train.shape[0], 1),
+        device=inputs_train.device,
+        dtype=inputs_train.dtype,
+    )
+    ones_test = torch.ones(
+        (inputs_test.shape[0], 1),
+        device=inputs_test.device,
+        dtype=inputs_test.dtype,
+    )
     design_train = torch.cat((inputs_train, ones_train), dim=1)
     design_test = torch.cat((inputs_test, ones_test), dim=1)
     solution = torch.linalg.lstsq(design_train, targets_train).solution
@@ -158,6 +168,9 @@ def gist_versus_specific(
     """
     if specific_targets.ndim == 1:
         specific_targets = specific_targets.unsqueeze(-1)
+    train_index = train_index.to(activations.device)
+    test_index = test_index.to(activations.device)
+    specific_targets = specific_targets.to(activations.device)
     original_r2 = _linear_probe_r2(
         activations.index_select(0, train_index),
         specific_targets.index_select(0, train_index),

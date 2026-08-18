@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch
+import pytest
 
 from qwen_j_lens.nla.faithfulness import (
     FaithfulnessReport,
@@ -115,6 +116,32 @@ def test_code_usage_distinguishes_memorized_from_clustered() -> None:
 
     assert memorized_usage["distinct_code_fraction"] == 1.0
     assert clustered_usage["distinct_code_fraction"] < 0.2
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
+def test_faithfulness_audit_accepts_cuda_tensors() -> None:
+    activations = torch.randn((12, 4), device="cuda")
+    codes = (torch.arange(12, device="cuda") % 3).unsqueeze(1)
+    train_index = torch.arange(0, 6)
+    test_index = torch.arange(6, 12)
+
+    result = independent_reader_gap(
+        codes,
+        activations,
+        train_index=train_index,
+        test_index=test_index,
+        code_vocab=3,
+        width=4,
+        embedding_dim=2,
+        steps=2,
+        seed=0,
+    )
+
+    assert set(result) == {
+        "co_adapted_test_error",
+        "independent_test_error",
+        "gap",
+    }
 
 
 def test_report_flags_and_serialization() -> None:
