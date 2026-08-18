@@ -11,7 +11,7 @@ from typing import Any, Sequence
 import numpy as np
 import torch
 
-from qwen_j_lens.artifacts import ArtifactStore
+from qwen_j_lens.artifacts import ArtifactStore, capture_source_state, portable_path
 from qwen_j_lens.config import RunConfig
 
 
@@ -82,6 +82,7 @@ def merge_estimate_shards(
     layer: int,
 ) -> None:
     """Merge a complete, nonoverlapping prompt partition by context count."""
+    source = capture_source_state()
     if layer not in config.estimation.layers:
         raise ValueError("Merged layer must be declared in estimation.layers")
     if not inputs:
@@ -144,13 +145,14 @@ def merge_estimate_shards(
                     "context_count": shard.context_count,
                     "offset": shard.offset,
                     "pair_count": shard.pair_count,
-                    "path": str(shard.root),
+                    "path": portable_path(shard.root),
                     "prompt_count": shard.prompt_count,
                 }
                 for shard in shards
             ],
             "model_id": config.model.model_id,
             "model_revision": config.model.revision,
+            "source": source,
             "prompt_shard": {
                 "count": expected_offset,
                 "offset": 0,

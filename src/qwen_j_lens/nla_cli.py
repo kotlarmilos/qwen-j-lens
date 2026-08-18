@@ -13,7 +13,11 @@ import numpy as np
 import torch
 
 from qwen_j_lens.adapter import ModelAdapter
-from qwen_j_lens.artifacts import ArtifactStore, portable_path
+from qwen_j_lens.artifacts import (
+    ArtifactStore,
+    capture_source_state,
+    portable_path,
+)
 from qwen_j_lens.nla.activations import ActivationBatch, collect_layer_activations
 from qwen_j_lens.nla.config import NLARunConfig, load_nla_config
 from qwen_j_lens.nla.faithfulness import (
@@ -98,6 +102,7 @@ def execute_nla(
     against the tiny local transformer during tests and against an open-weight
     model on an accelerator.
     """
+    source = capture_source_state()
     random.seed(config.seed)
     torch.manual_seed(config.seed)
     prompts = _corpus_prompts(config.activations.corpus_path, config.activations.max_prompts)
@@ -203,6 +208,7 @@ def execute_nla(
                 "faithfulness": asdict(config.faithfulness),
             },
             "model_id": adapter.model_id,
+            "source": source,
             "activation_rows": int(activations.shape[0]),
             "specific_targets": (
                 None if specific_targets is None else portable_path(specific_targets)

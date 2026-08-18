@@ -6,6 +6,7 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import subprocess
 from typing import Any, Mapping
 
 import numpy as np
@@ -28,6 +29,32 @@ def portable_path(path: str | Path) -> str:
         return resolved.relative_to(Path.cwd().resolve()).as_posix()
     except ValueError:
         return resolved.name
+
+
+def capture_source_state() -> dict[str, str]:
+    """Capture the tracked Git source state before an artifact-producing run."""
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except FileNotFoundError:
+        return {"git_revision": "unavailable", "git_status": "git executable unavailable"}
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.strip() or "Git source state unavailable"
+        return {"git_revision": "unavailable", "git_status": detail}
+    return {
+        "git_revision": revision,
+        "git_status": "clean" if not status else status,
+    }
 
 
 @dataclass(frozen=True)

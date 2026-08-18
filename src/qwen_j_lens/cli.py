@@ -12,7 +12,11 @@ from typing import Sequence
 import numpy as np
 import torch
 
-from qwen_j_lens.artifacts import ArtifactStore, portable_path
+from qwen_j_lens.artifacts import (
+    ArtifactStore,
+    capture_source_state,
+    portable_path,
+)
 from qwen_j_lens.config import RunConfig, load_config
 from qwen_j_lens.jacobian import estimate_token_vjps
 from qwen_j_lens.merge import merge_estimate_shards
@@ -71,6 +75,7 @@ def run_estimation(
     max_prompts: int | None = None,
 ) -> None:
     """Estimate controlled rows of W_U J_l directly with selected-token VJPs."""
+    source = capture_source_state()
     random.seed(config.seed)
     torch.manual_seed(config.seed)
     adapter = QwenAdapter.from_pretrained(
@@ -168,6 +173,7 @@ def run_estimation(
                 },
                 "model_id": adapter.model_id,
                 "model_revision": config.model.revision,
+                "source": source,
                 "prompt_shard": {
                     "offset": prompt_offset,
                     "count": len(prompts),
@@ -294,6 +300,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "evaluate":
+        source = capture_source_state()
         adapter = QwenAdapter.from_pretrained(
             config.model.model_id,
             local_files_only=False if args.allow_download else True,
@@ -369,7 +376,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "model_id": config.model.model_id,
                 "model_revision": config.model.revision,
                 "layer": layer_index,
-                "jacobian_vectors": str(args.lens_vectors),
+                "jacobian_vectors": portable_path(args.lens_vectors),
+                "source": source,
                 "baselines": ["jacobian", "logit"],
                 "enable_thinking": config.model.enable_thinking,
                 "kv_cache": True,
