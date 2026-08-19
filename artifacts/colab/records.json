@@ -1,0 +1,10 @@
+[
+  {
+    "kind": "json",
+    "metadata": {
+      "description": "Publication hardware, software, input, model, and source provenance"
+    },
+    "path": "environment.json",
+    "sha256": "01761d76e34e8e39a48cffecaeb8c343df9e4a6bea8fcbbf166b89e88e1fac64"
+  }
+]

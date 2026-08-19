@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -39,17 +40,26 @@ def test_npy_storage_is_deterministic_and_verified(tmp_path) -> None:
     assert np.array_equal(first.read_array(first_record), array)
 
 
-def test_repository_manifest_separates_tested_and_pending() -> None:
+def test_repository_manifest_separates_tested_and_measured_runs() -> None:
     manifest = json.loads(
         open("artifacts/manifest.json", encoding="utf-8").read()
     )
 
     assert manifest["locally_tested"]["network_required"] is False
-    assert len(manifest["pending_qwen_experiments"]) == 4
-    methods = {entry["method"] for entry in manifest["pending_qwen_experiments"]}
-    assert methods == {"j-lens", "natural-language-autoencoder"}
-    assert "pending" in manifest["claim_status"]
+    assert manifest["pending_qwen_experiments"] == []
+    methods = {
+        entry["method"]
+        for entry in manifest["publication_scale_runs"]["runs"]
+    }
+    assert "controlled-subset-j-lens" in methods
+    assert "fixed-symbol-autoencoder-faithfulness-audit" in methods
+    assert "single-method Qwen3-8B runs are complete" in manifest["claim_status"]
     assert "not publication measurements" in manifest["claim_status"]
+    corpus = Path("data/publication_calibration_prompts.jsonl")
+    assert (
+        hashlib.sha256(corpus.read_bytes()).hexdigest()
+        == manifest["publication_calibration"]["corpus_sha256"]
+    )
 
 
 def test_publication_runs_declare_a_finding_and_a_caveat() -> None:

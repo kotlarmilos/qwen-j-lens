@@ -102,7 +102,13 @@ def validate_artifacts(root: Path) -> tuple[bool, str, dict[str, Any]]:
             manifest,
         )
 
-    summary_path = root / "evaluation/summary.json"
+    summary_relative = manifest.get("display_summary")
+    if not isinstance(summary_relative, str):
+        return False, "Manifest does not declare `display_summary`.", manifest
+    try:
+        summary_path = _safe_path(root, root, summary_relative)
+    except ValueError as error:
+        return False, str(error), manifest
     try:
         summary = _load_json(summary_path)
     except (OSError, json.JSONDecodeError) as error:

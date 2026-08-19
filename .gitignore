@@ -14,8 +14,8 @@ artifacts/evaluation/
 .cache/
 
 # Real Qwen run outputs stay tracked. They are the evidence for every measured
-# number in the article and total well under a megabyte, so a reader can check
-# the claims against the committed artifacts.
+# number in the article, including the 10 MB NLA code array used to verify code
+# collapse, so a reader can check the claims against the committed artifacts.
 
 
 # Internal release checklist, not published

@@ -1,6 +1,7 @@
 {
   "artifact_schema_version": 2,
-  "claim_status": "Publication-scale Qwen3-8B results are limited to the cross-method agreement run and its capacity diagnostic, both recorded under publication_scale_runs. The cross-method run is reported as a diagnosed failure of the autoencoder side rather than an agreement measurement. Two corrections apply to the development-scale reconstruction error of 0.006. The row-count sweep shows it was a redundancy artifact of a sixty-four row sample. The bit-budget and seed-stability study under local_development_runs then shows that the capacity explanation offered for the failure was itself wrong, since the twenty-four bit code escapes collapse on two seeds of twenty and the within-configuration spread exceeds every between-configuration difference. Any single-seed reconstruction error from this bottleneck is therefore reported as a draw from a bimodal distribution rather than as a measurement. The two single-method 8B runs remain pending and are listed under pending_qwen_experiments. Development-scale Qwen3-4B runs are recorded under local_development_runs and are explicitly not publication measurements.",
+  "claim_status": "The preregistered single-method Qwen3-8B runs are complete. In the controlled 13-token J-lens subset, directed modulation is a small matched-prompt trajectory contrast. The internal-reasoning probe reads the coordinate directly manipulated at the same layer, so it is an intervention-plumbing sanity check rather than a downstream causal result. The verbal-report score is floored and selectivity is ceilinged, with identical generated text across both arms, so neither text protocol measures an effect. This does not support a vocabulary-wide J-space claim. The fixed-symbol autoencoder collapses to two code strings over 159,325 activation rows and fails to beat the zero predictor, so its near-zero independent-reader gap is not evidence of faithfulness. It is a discrete-symbol surrogate rather than a reproduction of a natural-language verbalizer. The earlier cross-method run, capacity diagnostic, and seed-stability controls remain bounded as recorded below. Development-scale Qwen3-4B runs are not publication measurements.",
+  "display_summary": "colab/qwen3-8b-layer-24-evaluate/summary.json",
   "local_development_runs": {
     "hardware": "Apple Silicon (arm64) CPU, 16 GiB unified memory, macOS. No CUDA. Model loaded fully resident on CPU (device_map omitted) in bfloat16.",
     "model_id": "Qwen/Qwen3-4B-Instruct-2507",
@@ -116,7 +117,7 @@
         "method": "bit-budget frontier and optimization-stability control",
         "name": "qwen3-4b-bit-budget-layer18",
         "records": "artifacts/qwen3-4b-bit-budget-layer18/records.json",
-        "records_sha256": "c2e06b3c75c5ff98dd6de479a840d1f14d36960c78bf68683cd92780b5af9b87",
+        "records_sha256": "a652a1d7ca0822c323798c78b84a54407776ba787778b9adb7485cf49bf3e8f9",
         "seed_stability_summary": {
           "published_24_bits": {
             "best": 0.12995709478855133,
@@ -187,35 +188,10 @@
       "offline end-to-end autoencoder artifact pipeline on the toy adapter"
     ]
   },
-  "pending_qwen_experiments": [
-    {
-      "config": "configs/smoke.toml",
-      "method": "j-lens",
-      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
-      "status": "local development run complete on CPU (configs/local-4b-dev.toml, layer 24, 2 calibration prompts); publication run pending accelerator"
-    },
-    {
-      "config": "configs/qwen-publication.toml",
-      "method": "j-lens",
-      "model_id": "Qwen/Qwen3-8B",
-      "status": "pending accelerator run"
-    },
-    {
-      "config": "configs/nla-smoke.toml",
-      "method": "natural-language-autoencoder",
-      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
-      "status": "local development run complete on CPU (configs/local-4b-nla-dev.toml, layer 18, 8 corpus prompts); publication run pending accelerator"
-    },
-    {
-      "config": "configs/nla-publication.toml",
-      "method": "natural-language-autoencoder",
-      "model_id": "Qwen/Qwen3-8B",
-      "status": "pending accelerator run"
-    }
-  ],
+  "pending_qwen_experiments": [],
   "publication_calibration": {
     "contexts": 1000,
-    "corpus_sha256": "7919f2c32e2fa0da9ab79690b00844d5d7ce6d52f76a2c8ca6dc010e8b891e3",
+    "corpus_sha256": "7919f2c32e2fa0da9ab79690b00844d5d7ce6d52f76a2c8ca6dc010e8b891e3c",
     "dataset": "Salesforce/wikitext",
     "dataset_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
     "estimation_shards": 10,
@@ -223,11 +199,71 @@
     "subset": "wikitext-2-raw-v1"
   },
   "publication_scale_runs": {
-    "hardware": "NVIDIA RTX A6000 48 GiB, bfloat16, device_map=auto. Analysis stage CPU-resident.",
+    "environment": {
+      "bytes": 1097,
+      "path": "artifacts/colab/environment.json",
+      "sha256": "01761d76e34e8e39a48cffecaeb8c343df9e4a6bea8fcbbf166b89e88e1fac64"
+    },
+    "hardware": "The cross-method runs used one NVIDIA RTX A6000 48 GiB. The single-method J-lens and autoencoder runs used one NVIDIA A100 PCIe 80 GiB. Qwen inference used bfloat16 with device_map=auto.",
     "model_id": "Qwen/Qwen3-8B",
     "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
     "network_required": false,
     "runs": [
+      {
+        "artifact_dir": "artifacts/colab/qwen3-8b-layer-24-merged",
+        "calibration_prompts": 1000,
+        "caveat": "This is a controlled subset of thirteen declared token directions estimated from WikiText, not the broad overcomplete vocabulary bank used for J-space in the source work. The trajectory scores are cosine differences against raw vector banks and are not calibrated probabilities. The internal-reasoning probe reads the directly edited coordinate at the edit layer and does not measure downstream propagation. Repeated generation leaves only four distinct directed-modulation values and three distinct edit-readback values per lens. The verbal-report and selectivity scorers saturate, the configured edit strength provides no positive control for changing decoded text, no blinded manual review was run, and neither text protocol yields an interpretable effect.",
+        "config": "configs/qwen-publication.toml",
+        "context_count": 1000,
+        "controlled_tokens": 13,
+        "evaluation_artifact_dir": "artifacts/colab/qwen3-8b-layer-24-evaluate",
+        "evaluation_records": "artifacts/colab/qwen3-8b-layer-24-evaluate/records.json",
+        "evaluation_records_sha256": "f91739f6f9d2c5aec8d54828be0bac7a1673947c8807ba36998fc82c434cee90",
+        "evaluation_rows": 80,
+        "finding": "Directed modulation compares different unedited prompts and yields a Jacobian signed mean of 0.00791, so it is a matched-prompt contrast rather than a causal intervention. The internal-reasoning rows apply controlled-subset ablation and a C-to-B coordinate swap, then probe the edited coordinate at the same layer; their signed mean -0.00277 and mean absolute damage 0.00839 confirm edit arithmetic rather than a change in reasoning. The matched raw logit-vector means are 0.00151 and -0.00424. Verbal report is floored at zero and selectivity is ceilinged at one in both arms, with byte-identical generations, so their zero arithmetic differences are null protocols rather than null results.",
+        "hardware": "NVIDIA A100 80GB PCIe",
+        "layer": 24,
+        "merged_vector_sha256": "019c4b1e29511cb305de4e64047c2df478ff917fb16ad9a1d5344a615785dbaf",
+        "method": "controlled-subset-j-lens",
+        "name": "qwen3-8b-primary-publication",
+        "pair_count": 15620093,
+        "records": "artifacts/colab/qwen3-8b-layer-24-merged/records.json",
+        "records_sha256": "38172759ef37a3cb8fb317e27b274c59c796cc0da4d07fa74109ec5a8e90c075",
+        "seeds": [
+          11,
+          29,
+          47,
+          71,
+          101
+        ],
+        "source_commit": "78e44c5f6a8141bdced99080f6c20cd4a46fbb67",
+        "stage": "estimate-merge-evaluate"
+      },
+      {
+        "activation_rows": 159325,
+        "artifact_dir": "artifacts/colab/nla-qwen3-8b",
+        "available_code_bits": 64,
+        "caveat": "The verbalizer emits eight fixed symbols rather than natural-language text, only one initialization seed was run, and no labeled specific targets were supplied, so the gist-versus-specific probe was not executed. The result diagnoses this configured surrogate and does not show that natural-language autoencoders in general fail.",
+        "code_length": 8,
+        "code_vocab": 256,
+        "config": "configs/nla-publication.toml",
+        "distinct_code_fraction": 1.255295779067943e-05,
+        "finding": "After 4,000 steps the autoencoder has relative reconstruction error 1.005, uses only two distinct code strings and eight symbols across 159,325 layer-24 activation rows, and has mean slot entropy 0.0296. Its co-adapted and independent readers both fail at about 0.999 relative error, leaving a gap of 0.0000069. A near-zero gap between two failed readers is not faithfulness evidence.",
+        "hardware": "NVIDIA A100 80GB PCIe",
+        "independent_reader_gap": 6.9141387939453125e-06,
+        "layer": 24,
+        "mean_slot_entropy": 0.029587507247924805,
+        "method": "fixed-symbol-autoencoder-faithfulness-audit",
+        "name": "qwen3-8b-nla-primary",
+        "reconstruction_error": 1.0051531791687012,
+        "records": "artifacts/colab/nla-qwen3-8b/records.json",
+        "records_sha256": "65f3654113da60784900d5003aeb0d5a49cb86439ea5dc1b6008c33bef37b710",
+        "source_commit": "562b90998db568efac2cefe640a8273516469748",
+        "stage": "nla-run",
+        "train_steps": 4000,
+        "unique_code_strings": 2,
+        "used_symbols": 8
+      },
       {
         "activation_rows": 39697,
         "artifact_dir": "artifacts/qwen3-8b-cross-publication-layer24",
@@ -372,13 +408,15 @@
     "scope": "publication-scale runs on the real Qwen3-8B weights, executed on a rented single-GPU host"
   },
   "required_uploaded_artifacts": [
-    "qwen3-4b-development/records.json",
-    "qwen3-8b-primary-publication/records.json",
-    "evaluation/records.json",
-    "evaluation/results.jsonl",
-    "evaluation/summary.json",
-    "nla-qwen3-4b/records.json",
-    "nla-qwen3-8b/records.json",
-    "nla-qwen3-8b/faithfulness.json"
+    "qwen3-4b-dev-lens-layer24/records.json",
+    "colab/records.json",
+    "colab/environment.json",
+    "colab/qwen3-8b-layer-24-merged/records.json",
+    "colab/qwen3-8b-layer-24-evaluate/records.json",
+    "colab/qwen3-8b-layer-24-evaluate/results.jsonl",
+    "colab/qwen3-8b-layer-24-evaluate/summary.json",
+    "qwen3-4b-nla-dev-layer18/records.json",
+    "colab/nla-qwen3-8b/records.json",
+    "colab/nla-qwen3-8b/faithfulness.json"
   ]
 }

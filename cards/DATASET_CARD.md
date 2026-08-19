@@ -55,8 +55,12 @@ inconvenient runs.
 
 The set is small and English-only. Keyword scores are insufficient by
 themselves and require blinded manual review. Prompt sensitivity and token
-boundary effects can dominate small samples. Results test functional workspace
-properties and do not establish consciousness.
+boundary effects can dominate small samples. In the measured Qwen3-8B run, the
+verbal-report keyword score is floored at zero and the selectivity score is
+ceilinged at one in both arms. Generated text is identical across the paired
+arms for these rows, and no blinded manual review was run, so those rows do not
+support an effect estimate. Results test functional workspace properties and do not
+establish consciousness.
 
 ## Project links
 

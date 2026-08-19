@@ -16,17 +16,22 @@ standard. The first is Anthropic's J-lens, which reads an activation as a set of
 directions the model itself uses to write tokens. The second is Anthropic's Natural
 Language Autoencoder, which verbalizes an activation into text and then checks
 whether that text carries the activation back. The two methods answer different
-questions, and comparing them is the point of this project.
+questions, and comparing them is the point of this project. On Qwen3-8B, the
+controlled J-lens subset produces a small matched-prompt trajectory contrast and a
+small direct edit-readback sanity check, while the two text metrics saturate and
+cannot measure an effect. The fixed-symbol autoencoder collapses to two code strings
+and fails to reconstruct better than zero, so its tiny independent-reader gap is not
+evidence of faithfulness.
 
 ## The problem
 
-The important word is experiment. I have built and tested the machinery for both
-methods against a tiny local transformer. I have not run the open-weight Qwen study
-yet. There are no reproduction numbers hiding in this repository, and I will not
-fill that gap with screenshots from an incomplete pilot. A transformer carries
-information forward through its residual stream. Pick an activation at layer `l` and
-token position `t`. Both methods take that vector as their subject. They disagree
-about how to turn it into something a person can read.
+The important word is experiment. I first tested the machinery against a tiny local
+transformer, then ran the preregistered study on the pinned Qwen3-8B weights. The
+repository includes the raw evaluation rows, numerical arrays, audit summaries,
+source revisions, and hashes. A transformer carries information forward through its
+residual stream. Pick an activation at layer `l` and token position `t`. Both methods
+take that vector as their subject. They disagree about how to turn it into something
+a person can read.
 
 ## Intuition
 
@@ -95,15 +100,15 @@ source and target pair with equal weight, then averages across calibration promp
 
 `h_l  ->  verbalizer  ->  text code  ->  reconstructor  ->  h_hat_l`
 
-The offline machinery replaces the text code with a short sequence of discrete
-symbols over a fixed vocabulary. Each symbol stands in for a word that a
-language-model verbalizer would emit. The verbalizer is a small network from the
-activation to per-slot symbol logits. A straight-through argmax makes the code
-discrete on the forward pass while still passing gradients to the verbalizer on the
-backward pass. The reconstructor embeds the symbols and maps them back to the
-residual width. On an accelerator the verbalizer becomes an actual text decoder and
-the code becomes real words, and the structure carried by the tests here transfers
-without change.
+This implementation replaces the text code with a short sequence of discrete
+symbols over a fixed vocabulary. Each symbol is only a surrogate for a word. The
+verbalizer is a small network from the activation to per-slot symbol logits. A
+straight-through argmax makes the code discrete on the forward pass while still
+passing gradients to the verbalizer on the backward pass. The reconstructor embeds
+the symbols and maps them back to the residual width. The accelerator run uses this
+same fixed-symbol surrogate. It does not become a language-model text decoder, so
+the autoencoder result below is not a reproduction of natural-language
+verbalization.
 
 ### Reconstruction is necessary, not sufficient
 
@@ -190,6 +195,81 @@ absent or corrupt, it displays no result. Neither method here can establish
 subjective experience. The J-lens paper is careful to separate functional access
 from phenomenal consciousness, and an open-weight replication should preserve that
 distinction for both methods.
+
+## The single-method Qwen3-8B result
+
+The primary run used the pinned Qwen3-8B revision on one A100 PCIe 80 GB GPU. Ten
+checksum-validated shards estimate thirteen controlled token directions at layer 24
+from 1,000 WikiText contexts and 15,620,093 valid source-target position pairs. A
+context-weighted merge produces one `13 x 4096` vector array. The held-out protocol
+then evaluates eight paired prompts under five seeds with both the Jacobian and
+layer-matched logit vector banks, producing eighty raw rows.
+
+The trajectory metrics are cosine-similarity differences against those raw vector
+banks. They are not token probabilities, and final RMSNorm is not applied in this
+trajectory probe. Magnitudes from the two banks are therefore not directly
+comparable as calibrated readout scores.
+
+| Property | Comparison | Jacobian signed mean | Jacobian absolute damage | Logit signed mean | Logit absolute damage |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Directed modulation | Matched prompts, no intervention | 0.00791 | 0.00791 | 0.00151 | 0.00296 |
+| Internal-reasoning edit readback | Subset ablation and coordinate swap | -0.00277 | 0.00839 | -0.00424 | 0.00424 |
+
+Directed modulation compares two different unedited prompts. It is a matched-prompt
+contrast, not a causal lens intervention. The internal-reasoning rows are not a
+causal reasoning result either. `reasoning-route` removes the full controlled span,
+including the probed `C` direction, and `reasoning-plan` directly swaps the probed
+`C` coordinate toward `B`. The probe then reads the edited vector at the same layer
+while the hook remains active. It therefore checks that ablation and swapping alter
+the coordinate they directly manipulate. It does not measure downstream propagation
+or a change in reasoning.
+
+The signed Jacobian mean also hides opposing edit readbacks: `reasoning-route` is
+`+0.00562` under every seed, while `reasoning-plan` ranges from `-0.00903` to
+`-0.01257`. The absolute-damage column makes that cancellation visible, but neither
+quantity should be interpreted as a behavioral effect.
+
+Five seeds do not provide five distinct outcomes here. Repeated generations collide,
+leaving four distinct directed-modulation values and three distinct
+internal-reasoning values per lens. These are small protocol observations, not
+precise estimates.
+
+The text metrics do not produce usable measurements. Every verbal-report score is
+zero in both arms, every selectivity target and control score is one in both arms,
+and every baseline and intervention generation is byte-identical. Verbal report is
+at the floor, selectivity is at the ceiling, and no blinded manual review was run.
+The controlled directions also have small cosine alignment with the layer-24
+residual, so the configured edit strength provides no positive control that should
+have changed decoded text. Reporting the arithmetic difference as a measured zero
+would turn a null protocol into a null result.
+
+More importantly, thirteen declared token directions are not the source paper's
+broad overcomplete vocabulary bank. This run supports one matched-prompt trajectory
+contrast and confirms that the intervention code changes the coordinate it directly
+edits. It does not support a claim about downstream reasoning, vocabulary-wide
+J-space, or a full functional workspace.
+
+The autoencoder reads the same layer over the same 1,000 contexts, yielding 159,325
+activation rows. Its code has eight slots over 256 symbols, the training schedule is
+4,000 steps, and the full run uses one preregistered seed. It collapses.
+
+| Autoencoder measurement | Result |
+| --- | ---: |
+| Relative reconstruction error | 1.00515 |
+| Unique code strings | 2 |
+| Symbols used | 8 of 256 |
+| Mean per-slot entropy | 0.02959 |
+| Co-adapted reader error | 0.99887 |
+| Independent reader error | 0.99888 |
+| Reader gap | 0.0000069 |
+
+The zero predictor has relative error 1.0 by construction, so 1.005 means the code
+does not reconstruct useful residual information. The independent-reader gap is
+near zero only because both readers fail at the same level. Calling that
+faithfulness would invert the audit. No labeled specific targets were supplied, so
+the gist-versus-specific probe was not run. This result diagnoses one fixed-symbol
+architecture and one seed. It does not show that the source paper's
+natural-language verbalizer fails.
 
 A development-scale run on the real `Qwen3-4B-Instruct-2507` weights now exists. It
 ran on a single Apple Silicon machine, resident on CPU in bfloat16, fully offline
@@ -396,19 +476,17 @@ The limits are specific. Twenty seeds estimate an escape rate to about one part 
 twenty, so the gap between two in twenty and three in twenty is not resolved. The
 sweeps use the published six-hundred step schedule, so a longer schedule or a
 temperature anneal might raise the escape rate at every budget. Everything in this
-section is measured at 4B layer 18 on a CPU, and an 8B replication needs an
-accelerator. The 8B J-lens and autoencoder publication runs at the preregistered
-layer remain separate pending jobs, so this result speaks to the cross-method study
-and to the autoencoder recipe rather than to the method in general.
+section is measured at 4B layer 18 on a CPU. The 8B single-method run above uses a
+different eight-slot code and one seed, and its collapse is consistent with the
+unstable regime rather than an independent estimate of escape probability.
 
-The remaining step is accelerator execution for the two single-method publication
-runs. The 8B primary estimate splits into ten checksum-validated shards at layer 24
-followed by one dual-lens evaluation, and the autoencoder path collects activations
-at the same layer, trains the verbalizer and reconstructor, and writes the
-faithfulness audit. The cross-method study has now run at 8B and is reported above.
-Until the two single-method 8B artifacts exist, those claims stay a reproducible
-experiment plan with tested local components, a verified 4B development run, and a
-publication-scale cross-method result, not a reproduced publication result.
+The completed evidence supports two narrow conclusions. Selected Qwen3-8B J-lens
+directions produce one small matched-prompt trajectory contrast and one small
+direct edit-readback sanity check, while the text-score protocols saturate and
+remain uninterpretable. This does not establish a downstream causal effect or recover
+the broader workspace result. The configured fixed-symbol autoencoder collapses and
+provides no faithful description. Both are useful boundaries for work that extends
+these methods, and neither is a full reproduction of its source paper.
 
 Expected publication locations, not yet live:
 

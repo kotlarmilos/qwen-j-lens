@@ -28,7 +28,7 @@ causal interventions, matched controls, and reconstruction audits.
 
 ## Base models
 
-Development uses `Qwen/Qwen3-4B-Instruct-2507`. The primary planned run uses
+Development uses `Qwen/Qwen3-4B-Instruct-2507`. The primary measured run uses
 `Qwen/Qwen3-8B`. Both artifacts pin an upstream revision and disable thinking
 mode during the paired evaluation. Refer to each upstream model card for its
 license, limitations, and intended use.
@@ -55,9 +55,14 @@ SHA-256 digest, and `run.json` records the model, layer, and method.
 
 ## Current status
 
-Only tiny local toy-model paths are tested in this release candidate. The
-manifest marks both Qwen runs as pending. There are no empirical reproduction
-results to report.
+The primary Qwen3-8B runs are complete. The controlled 13-token J-lens estimate
+covers 1,000 contexts and 15,620,093 position pairs. Its held-out trajectory
+protocol finds a small matched-prompt contrast and confirms that direct coordinate
+edits change the coordinate read back at the same layer. That readback is not a
+downstream reasoning effect. The verbal-report and selectivity text scorers
+saturate and do not measure an effect. The fixed-symbol autoencoder collapses to
+two code strings and does not beat the zero predictor. These are bounded negative
+and partial results, not empirical reproductions of either full source method.
 
 ## Limitations
 
@@ -72,11 +77,12 @@ tokenization, prompting, or generation behavior. Functional workspace evidence
 does not establish consciousness.
 
 The autoencoder machinery uses a discrete symbol code in place of real words in
-the offline setting, so the local tests measure the audit mechanics rather than
-the readability of natural-language descriptions. A low reconstruction error is
-not sufficient evidence of a faithful description. The independent-reader gap and
-the gist-versus-specific probe are the checks that separate a faithful code from
-a co-adapted private code or a gist-only code.
+both local tests and the accelerator run, so it measures the surrogate and audit
+mechanics rather than the readability of natural-language descriptions. A low
+reconstruction error is not sufficient evidence of a faithful description. The
+independent-reader gap and the gist-versus-specific probe are the checks that
+separate a faithful code from a co-adapted private code or a gist-only code. The
+measured run supplied no labeled specific targets, so the gist probe was not run.
 
 The straight-through discrete bottleneck is unstable across random seeds. Refitting
 one fixed configuration twenty times on real Qwen3-4B layer-18 activations shows the

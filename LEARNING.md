@@ -151,8 +151,9 @@ The value used downstream equals `hard`, because `soft - soft.detach()` is zero 
 the forward pass, while the gradient equals the gradient of `soft`, because
 `hard` and `soft.detach()` are constants to autograd. In the offline machinery the
 symbols stand in for the words a language-model verbalizer would emit, which keeps
-the loop deterministic and cheap. On an accelerator the verbalizer becomes a text
-decoder and the symbols become real words, and the structure is unchanged.
+the loop deterministic and cheap. The accelerator path in this repository keeps
+the same symbol vocabulary. Replacing it with a language-model text decoder is a
+different implementation and remains outside the measured claim.
 
 ### Keeping the code from collapsing
 
@@ -384,8 +385,9 @@ that look like frontiers and are not. The positive control in
 exists, since clustered rows keep a low error at every row count, and the seed
 controls there check that a repeated seed reproduces its error exactly.
 
-Everything here is tested against the tiny local transformer in `tests/toy.py`.
-The two single-method open-weight Qwen runs remain pending accelerator jobs, and no
-reproduction number is claimed until those artifacts exist and are reviewed. The
-cross-method study and the capacity diagnostics have run at publication scale on
-Qwen3-8B and are reported above.
+The known-answer invariants are tested against the tiny local transformer in
+`tests/toy.py`. The two single-method open-weight Qwen3-8B runs, the cross-method
+study, and the capacity diagnostics have also run on real weights. The measured
+J-lens result remains a thirteen-token controlled subset, and the measured
+autoencoder remains a fixed-symbol surrogate, so neither is a full reproduction
+of its source method.

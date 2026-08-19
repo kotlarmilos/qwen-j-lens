@@ -1,0 +1,32 @@
+{
+  "hardware": {
+    "driver": "550.54.15",
+    "gpu": "NVIDIA A100 80GB PCIe",
+    "gpu_memory_mib": 81920,
+    "pci_bus_id": "00000000:C5:00.0"
+  },
+  "inputs": {
+    "configs/nla-publication.toml": "04bdbf20e269a5f49add079da85025da90499cf5f1f274433c52e8a26e55ec96",
+    "configs/qwen-publication.toml": "19dbba6c44e70f6281bbbdae50e7f390398f99ef649286b717ffa69fd9675865",
+    "data/evaluation_prompts.jsonl": "80f94fcdd40ea1f6af7fe629c162323a7e10e766f91186658efbc9f0fea43e42",
+    "data/publication_calibration_prompts.jsonl": "7919f2c32e2fa0da9ab79690b00844d5d7ce6d52f76a2c8ca6dc010e8b891e3c"
+  },
+  "model": {
+    "id": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218"
+  },
+  "platform": {
+    "accelerate": "1.14.0",
+    "cuda_runtime": "12.4",
+    "cudnn": 90100,
+    "datasets": "4.8.5",
+    "kernel": "Linux 6.5.0-35-generic x86_64",
+    "python": "3.11.10",
+    "torch": "2.4.1+cu124",
+    "transformers": "5.13.1"
+  },
+  "source_commits": {
+    "j_lens": "78e44c5f6a8141bdced99080f6c20cd4a46fbb67",
+    "nla": "562b90998db568efac2cefe640a8273516469748"
+  }
+}

@@ -20,6 +20,7 @@ def _complete_tree(root) -> None:
     (root / "manifest.json").write_text(
         json.dumps(
             {
+                "display_summary": "evaluation/summary.json",
                 "required_uploaded_artifacts": [
                     "model-run/records.json",
                     "evaluation/summary.json",
