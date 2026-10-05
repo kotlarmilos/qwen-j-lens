@@ -1,4 +1,4 @@
-name = "qwen3-4b-cross-method-development"
+name = "qwen3-4b-collapse-diagnostic"
 seed = 20260712
 
 [model]
@@ -9,13 +9,13 @@ dtype = "bfloat16"
 # device_map omitted: load fully resident on CPU (no accelerate disk offload)
 
 # hidden_state_index selects the matched residual stream both methods read.
-# Index 0 is the embedding output; index k is the residual stream after block k.
+# Index 0 is the embedding output; index k >= 1 is the output after block k - 1.
 # The J-lens capture layer is hidden_state_index minus one, so the Jacobian
 # estimate hooks block k-1 whose output equals hidden_states[k]. This is the
 # alignment that lets the two methods score the same physical activations.
 [activations]
 hidden_state_index = 18
-corpus_path = "data/calibration_prompts.jsonl"
+corpus_path = "data/publication_calibration_prompts.jsonl"
 max_prompts = 4
 batch_size = 1
 
@@ -42,7 +42,7 @@ tokens = [
 include_future = true
 vjp_chunk_size = 32
 
-# The discrete code stands in for the words a language-model verbalizer emits.
+# The fixed symbol IDs are a reconstruction surrogate and do not emit text.
 [autoencoder]
 code_length = 4
 code_vocab = 64

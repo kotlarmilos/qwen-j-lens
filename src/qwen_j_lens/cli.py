@@ -16,6 +16,7 @@ from qwen_j_lens.artifacts import (
     ArtifactStore,
     capture_source_state,
     portable_path,
+    validate_artifact_tree,
 )
 from qwen_j_lens.config import RunConfig, load_config
 from qwen_j_lens.jacobian import estimate_token_vjps
@@ -245,11 +246,20 @@ def parser() -> argparse.ArgumentParser:
     merge.add_argument("--input", type=Path, action="append", required=True)
     merge.add_argument("--output", type=Path, required=True)
     merge.add_argument("--layer", type=int, required=True)
+    verify = commands.add_parser("verify-artifacts")
+    verify.add_argument("--root", type=Path, default=Path("artifacts"))
     return root
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    if args.command == "verify-artifacts":
+        valid, message = validate_artifact_tree(args.root)
+        if not valid:
+            raise ValueError(message)
+        print(message)
+        return 0
+
     config = load_config(args.config)
     if args.command == "validate-config":
         print(json.dumps(_validate(config), indent=2, sort_keys=True))

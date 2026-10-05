@@ -132,3 +132,104 @@ class ArtifactStore:
         if self.root.resolve() not in path.parents:
             raise ValueError("Artifact path escapes the store root")
         return path
+
+
+def _safe_artifact_path(root: Path, parent: Path, relative: str) -> Path:
+    path = (parent / relative).resolve()
+    if path != root and root not in path.parents:
+        raise ValueError(f"Artifact path escapes the root: {relative}")
+    return path
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_artifact_tree(root: str | Path) -> tuple[bool, str]:
+    """Verify the release manifest and every recursively discovered record file."""
+    artifact_root = Path(root).resolve()
+    manifest_path = artifact_root / "manifest.json"
+    if not manifest_path.is_file():
+        return False, f"Missing artifact manifest: {manifest_path}"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return False, f"Invalid artifact manifest: {error}"
+
+    errors: list[str] = []
+    for entry in manifest.get("required_evidence", []):
+        if not isinstance(entry, dict):
+            errors.append("Manifest required_evidence entries must be objects")
+            continue
+        relative = entry.get("path")
+        expected = entry.get("sha256")
+        if not isinstance(relative, str) or not isinstance(expected, str):
+            errors.append("Manifest evidence entries require path and sha256")
+            continue
+        try:
+            path = _safe_artifact_path(artifact_root, artifact_root, relative)
+        except ValueError as error:
+            errors.append(str(error))
+            continue
+        if not path.is_file():
+            errors.append(f"Missing required evidence: {relative}")
+            continue
+        if _file_sha256(path) != expected:
+            errors.append(f"SHA-256 mismatch for required evidence: {relative}")
+
+    records_paths = sorted(artifact_root.rglob("records.json"))
+    if not records_paths:
+        errors.append("No artifact records.json files were found")
+    for records_path in records_paths:
+        try:
+            records = json.loads(records_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            errors.append(
+                f"Invalid record file {records_path.relative_to(artifact_root)}: {error}"
+            )
+            continue
+        if not isinstance(records, list):
+            errors.append(
+                f"Record file {records_path.relative_to(artifact_root)} must be a list"
+            )
+            continue
+        for offset, record in enumerate(records):
+            if not isinstance(record, dict):
+                errors.append(
+                    f"Record {offset} in {records_path.relative_to(artifact_root)} "
+                    "must be an object"
+                )
+                continue
+            relative = record.get("path")
+            expected = record.get("sha256")
+            if not isinstance(relative, str) or not isinstance(expected, str):
+                errors.append(
+                    f"Record {offset} in {records_path.relative_to(artifact_root)} "
+                    "requires path and sha256"
+                )
+                continue
+            try:
+                path = _safe_artifact_path(
+                    artifact_root, records_path.parent, relative
+                )
+            except ValueError as error:
+                errors.append(str(error))
+                continue
+            if not path.is_file():
+                errors.append(
+                    f"Missing recorded artifact: {path.relative_to(artifact_root)}"
+                )
+                continue
+            if _file_sha256(path) != expected:
+                errors.append(
+                    f"SHA-256 mismatch for recorded artifact: "
+                    f"{path.relative_to(artifact_root)}"
+                )
+
+    if errors:
+        return False, "\n".join(errors)
+    return True, "All required evidence and artifact records are valid."

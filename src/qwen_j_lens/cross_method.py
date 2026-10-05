@@ -1,29 +1,20 @@
-"""Cross-method agreement between the J-lens and the natural-language autoencoder.
+"""Cross-method comparison for selected-token directions and symbol reconstruction.
 
-The J-lens paper and the natural-language autoencoder paper each localize a
-concept from the same residual stream, but they ask different questions. The
-J-lens asks whether a concept is present as a clean linear direction that reads
-the model's own next-token logit. The autoencoder asks whether a concept
-survives a discrete verbalize-and-reconstruct round trip. Neither paper measures
-whether the two methods agree on which concepts are recoverable at a matched
-layer. This module runs both methods on the same physical residual stream and
-reports per-concept agreement.
+This module compares one scalar selected-token J-lens score with the retention
+of the same next-token logit after a fixed-symbol reconstruction. It aligns both
+measurements to one residual state. The two axes use different probe capacities,
+so the result is a diagnostic comparison rather than a ranking of the source
+methods.
 
 For a controlled token ``t`` the ground-truth signal at each attended position is
 the model's own next-token logit for ``t``. The J-lens fidelity is the held-out
 coefficient of determination of that logit from the single stored J-lens
 direction. The autoencoder retention is the fraction of that logit's linear
 recoverability that survives the reconstruction, reusing the same gist probe the
-faithfulness module already defines. The two scores measure the two properties
-the J-lens article names, so a per-concept scatter separates concepts that both
-methods recover, concepts that only one method recovers, and concepts that
-neither recovers at that layer.
-
-A concept that scores high on the J-lens and low on the autoencoder is written in
-output coordinates that a description bottleneck drops. A concept that scores low
-on the J-lens and high on the autoencoder is carried in a form the reconstruction
-keeps without a clean linear readout. Both cases are informative, and neither is
-visible from one method alone.
+reader-check module defines. Thresholds divide the resulting pairs into four
+descriptive bins. Because one axis uses a single score and the other uses a
+multivariate probe, those bins do not identify a unique representational
+mechanism.
 """
 
 from __future__ import annotations
@@ -139,8 +130,8 @@ class AgreementReport:
             "quadrant_counts": dict(self.quadrant_counts),
             "concepts": [concept.to_mapping() for concept in self.concepts],
             "method": (
-                "matched-layer per-concept agreement between the linear J-lens "
-                "readout and the natural-language autoencoder gist probe"
+                "matched-layer per-concept comparison between one selected-token "
+                "J-lens score and a fixed-symbol reconstruction probe"
             ),
         }
 
@@ -185,6 +176,10 @@ def collect_activation_signals(
     token_ids: Sequence[int],
 ) -> tuple[Tensor, Tensor]:
     """Return activations and model concept logits at ``hidden_states[nla_layer]``.
+
+    Hidden-state index zero is the embedding output. Index ``k >= 1`` is the
+    output after block ``k - 1``, so the matching J-lens capture block is
+    ``nla_layer - 1``.
 
     Each attended position contributes one activation row and one row of
     next-token logits restricted to ``token_ids``. Padding positions never enter
@@ -539,9 +534,9 @@ def execute_cross_method(
             "model_id": adapter.model_id,
             "activation_rows": report.activation_rows,
             "method": (
-                "estimate matched-layer J-lens directions and autoencoder "
-                "reconstructions, then compare per-concept recoverability of the "
-                "model's own next-token logit"
+                "estimate matched-layer selected-token directions and fixed-symbol "
+                "reconstructions, then compare recovery of the model's next-token "
+                "logit with different probe capacities"
             ),
             "jlens_source": "https://transformer-circuits.pub/2026/workspace/index.html",
             "nla_source": "https://transformer-circuits.pub/2026/nla/index.html",

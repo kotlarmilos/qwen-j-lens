@@ -5,10 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "qwen-j-lens"
 version = "0.1.0rc1"
-description = "Offline-first tools for testing J-lens workspace properties on open-weight Qwen models"
+description = "Measured selected-token J-lens and fixed-symbol autoencoder experiments on Qwen3-8B"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
 authors = [{ name = "Milos Kotlar" }]
 dependencies = [
   "numpy>=1.26",
@@ -19,8 +18,6 @@ dependencies = [
 Repository = "https://github.com/kotlarmilos/qwen-j-lens"
 Article = "https://github.com/kotlarmilos/qwen-j-lens/blob/main/article.md"
 Artifacts = "https://huggingface.co/kotlarmilos/qwen-j-lens"
-Dataset = "https://huggingface.co/datasets/kotlarmilos/qwen-j-lens-evaluation"
-Space = "https://huggingface.co/spaces/kotlarmilos/qwen-j-lens"
 
 [project.optional-dependencies]
 qwen = [
@@ -29,7 +26,6 @@ qwen = [
   "transformers>=4.51",
 ]
 data = ["datasets>=3.2,<5"]
-space = ["gradio>=5.0"]
 test = ["pytest>=8.0"]
 
 [project.scripts]
@@ -41,7 +37,7 @@ qwen-cross = "qwen_j_lens.cross_method:main"
 packages = ["src/qwen_j_lens"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q -p no:cacheprovider"
 testpaths = ["tests"]
 pythonpath = ["src"]
 

@@ -4,40 +4,27 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="${PYTHON:-python}"
 JOB="${JOB:-plan}"
-CONFIG="${CONFIG:-configs/smoke.toml}"
+CONFIG="${CONFIG:-configs/qwen-publication.toml}"
 LAYER="${LAYER:-24}"
 PROMPT_OFFSET="${PROMPT_OFFSET:-0}"
 PROMPT_COUNT="${PROMPT_COUNT:-}"
 ALLOW_DOWNLOAD="${ALLOW_DOWNLOAD:-1}"
 PREPARE_CORPUS="${PREPARE_CORPUS:-1}"
-OUTPUT="${OUTPUT:-artifacts/colab/$(basename "$CONFIG" .toml)-layer-${LAYER}-${JOB}-offset-${PROMPT_OFFSET}}"
+OUTPUT="${OUTPUT:-artifacts/colab/qwen3-8b-layer-${LAYER}-${JOB}-offset-${PROMPT_OFFSET}}"
 LENS_VECTORS="${LENS_VECTORS:-}"
 CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 cd "$ROOT"
 
 if [[ "$JOB" == "plan" ]]; then
   cat <<'EOF'
-Run exactly one model, layer, and phase per accelerator runtime.
+Run one 100-context estimation shard per accelerator runtime.
 
-Development estimation:
-  JOB=estimate CONFIG=configs/smoke.toml LAYER=24 \
-    OUTPUT=artifacts/colab/qwen3-4b-layer-24-estimate \
-    ./scripts/colab_publication.sh
-
-Development evaluation with the downloaded estimation artifact:
-  JOB=evaluate CONFIG=configs/smoke.toml LAYER=24 \
-    LENS_VECTORS=artifacts/colab/qwen3-4b-layer-24-estimate/controlled-token-vectors-layer-024.npy \
-    OUTPUT=artifacts/colab/qwen3-4b-layer-24-evaluate \
-    ./scripts/colab_publication.sh
-
-Primary estimation, one 100-context shard per runtime:
-  JOB=estimate CONFIG=configs/qwen-publication.toml LAYER=24 \
-    PROMPT_OFFSET=0 PROMPT_COUNT=100 \
+  JOB=estimate PROMPT_OFFSET=0 PROMPT_COUNT=100 \
     OUTPUT=artifacts/colab/qwen3-8b-layer-24-shard-0000 \
     ./scripts/colab_publication.sh
 
-Repeat with offsets 100 through 900. After downloading all ten directories,
-merge them locally:
+Repeat with offsets 100 through 900. Merge the ten downloaded directories.
+
   python -m qwen_j_lens.cli merge-estimates \
     --config configs/qwen-publication.toml --layer 24 \
     --input artifacts/colab/qwen3-8b-layer-24-shard-0000 \
@@ -52,14 +39,14 @@ merge them locally:
     --input artifacts/colab/qwen3-8b-layer-24-shard-0900 \
     --output artifacts/colab/qwen3-8b-layer-24-merged
 
-Primary evaluation with the merged vectors:
-  JOB=evaluate CONFIG=configs/qwen-publication.toml LAYER=24 \
+Run evaluation with the merged direction array.
+
+  JOB=evaluate \
     LENS_VECTORS=artifacts/colab/qwen3-8b-layer-24-merged/controlled-token-vectors-layer-024.npy \
     OUTPUT=artifacts/colab/qwen3-8b-layer-24-evaluate \
     ./scripts/colab_publication.sh
 
-Set ALLOW_DOWNLOAD=0 only when the pinned model revision is already cached.
-Copy OUTPUT to persistent storage or download it before ending the runtime.
+Copy each output directory to persistent storage before ending the runtime.
 EOF
   exit 0
 fi
@@ -85,9 +72,9 @@ fi
   --config "$CONFIG" \
   "${DOWNLOAD_FLAG[@]}"
 
-if [[ "$CONFIG" == "configs/qwen-publication.toml" && "$PREPARE_CORPUS" == "1" ]]; then
+if [[ "$PREPARE_CORPUS" == "1" ]]; then
   "$PYTHON" scripts/prepare_publication_corpus.py
-elif [[ "$PREPARE_CORPUS" != "0" && "$PREPARE_CORPUS" != "1" ]]; then
+elif [[ "$PREPARE_CORPUS" != "0" ]]; then
   printf 'PREPARE_CORPUS must be 0 or 1.\n' >&2
   exit 2
 fi
@@ -105,7 +92,7 @@ if [[ "$JOB" == "estimate" ]]; then
     "${DOWNLOAD_FLAG[@]}"
 else
   if [[ -z "$LENS_VECTORS" || ! -f "$LENS_VECTORS" ]]; then
-    printf 'JOB=evaluate requires LENS_VECTORS to name a downloaded NPY artifact.\n' >&2
+    printf 'JOB=evaluate requires an existing LENS_VECTORS file.\n' >&2
     exit 2
   fi
   CUDA_VISIBLE_DEVICES="$CUDA_VISIBLE_DEVICES" "$PYTHON" -m qwen_j_lens.cli evaluate \

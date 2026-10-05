@@ -8,15 +8,17 @@ local_files_only = true
 dtype = "bfloat16"
 device_map = "auto"
 
-# hidden-state index. 0 is the embedding output; k is the residual stream after
-# block k. Layer 24 matches the preregistered middle layer used by the J-lens
-# evaluation so the two methods read the same location.
+# Hidden-state index 0 is the embedding output; k >= 1 is the output after block
+# k - 1. Index 24 is therefore after block 23. The primary J-lens hooks block 24,
+# whose output is hidden-state index 25, so the recorded primary runs are adjacent
+# rather than matched.
 [activations]
 layer = 24
 corpus_path = "data/publication_calibration_prompts.jsonl"
 max_prompts = 1000
 batch_size = 8
 
+# Fixed symbol IDs form a reconstruction bottleneck and do not emit text.
 [autoencoder]
 code_length = 8
 code_vocab = 256

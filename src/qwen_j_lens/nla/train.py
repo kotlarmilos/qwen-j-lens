@@ -1,4 +1,4 @@
-"""Deterministic training loop for the natural-language autoencoder."""
+"""Deterministic training loop for the fixed-symbol autoencoder."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import torch
 from torch import Tensor
 
 from qwen_j_lens.nla.autoencoder import (
-    NaturalLanguageAutoencoder,
+    FixedSymbolAutoencoder,
     reconstruction_error,
 )
 
@@ -17,7 +17,7 @@ from qwen_j_lens.nla.autoencoder import (
 class TrainResult:
     """Outcome of one autoencoder training run."""
 
-    model: NaturalLanguageAutoencoder
+    model: FixedSymbolAutoencoder
     history: list[dict[str, float]]
     final_relative_error: float
     final_code_entropy: float
@@ -50,7 +50,7 @@ def train_autoencoder(
     entropy_weight: float,
     seed: int,
 ) -> TrainResult:
-    """Train a verbalizer and reconstructor to minimize reconstruction error.
+    """Train a symbol encoder and reconstructor to minimize reconstruction error.
 
     The objective is reconstruction error minus a code-usage entropy bonus. The
     entropy term keeps the discrete bottleneck from collapsing onto one symbol in
@@ -68,7 +68,7 @@ def train_autoencoder(
     generator = torch.Generator(device=activations.device).manual_seed(seed)
     rows = activations.shape[0]
     effective_batch = min(batch_size, rows)
-    model = NaturalLanguageAutoencoder(
+    model = FixedSymbolAutoencoder(
         hidden_size=activations.shape[1],
         code_length=code_length,
         code_vocab=code_vocab,

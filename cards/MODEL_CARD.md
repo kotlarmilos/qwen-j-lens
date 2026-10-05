@@ -1,118 +1,73 @@
 ---
-license: mit
 library_name: transformers
 tags:
   - interpretability
   - jacobian-lens
-  - natural-language-autoencoder
+  - discrete-autoencoder
   - qwen
-  - mechanistic-interpretability
 ---
 
-# Qwen interpretability artifact card
+# Qwen3-8B interpretability artifacts
 
-This repository contains analysis code and, after accelerator runs, derived
-artifacts for two interpretability methods. The first is the J-lens. The second
-is a natural-language autoencoder with a faithfulness audit. It does not
-redistribute Qwen weights and it is not a new trained model.
+This artifact repository contains one measured Qwen3-8B study of 13
+selected-token J-lens directions and a fixed-symbol autoencoder. It does not
+contain model weights or a new language model.
 
-## Intended use
+## Main result
 
-The J-lens artifacts support controlled research on whether an open-weight Qwen
-instruct model exhibits functional workspace properties described by Gurnee and
-collaborators in July 2026. The autoencoder artifacts support research on whether
-a natural-language description of an activation is faithful, following the
-Natural Language Autoencoders method and the critique in *Train the Model, Not
-the Reader*. Intended users are interpretability researchers who can inspect
-causal interventions, matched controls, and reconstruction audits.
+The run uses `Qwen/Qwen3-8B` at revision
+`b968826d9c46dd6066d109eabc6255188de91218` on an NVIDIA A100 80 GB PCIe.
 
-## Base models
+The J-lens estimate covers 1,000 contexts and 15,620,093 valid position pairs.
+Its evaluation supports only a small unedited matched-prompt contrast and a
+same-layer edit readback. It does not establish a reasoning effect.
 
-Development uses `Qwen/Qwen3-4B-Instruct-2507`. The primary measured run uses
-`Qwen/Qwen3-8B`. Both artifacts pin an upstream revision and disable thinking
-mode during the paired evaluation. Refer to each upstream model card for its
-license, limitations, and intended use.
+The fixed-symbol autoencoder uses two code strings over 159,325 activation
+rows. Its centered relative reconstruction error is `1.00515`, which does not
+beat the constant-mean predictor at `1.0`. Both readers fail at about `0.999`.
+Their near-zero gap is not faithfulness evidence.
 
-## Artifact format
+No labeled specific-target probe was run. The retained primary artifacts do not
+support a zero-predictor comparison.
 
-Each `controlled-token-vectors-layer-NNN.npy` array has shape
-`[controlled_token_count, hidden_size]`. Its rows are estimated directly with
-selected-token VJPs from the final pre-normalization residual. `records.json`
-binds arrays to layer indices, token IDs, token strings, source-target pair
-counts, and SHA-256 digests. The Qwen path does not materialize the full
-hidden-width square Jacobian. Final RMSNorm is applied after `J_l h_l` during
-lens readout. `run.json` records the model and method. The primary estimate is
-partitioned into ten 100-context shards. The merge command verifies every array
-hash and requires contiguous coverage of contexts 0 through 999 before writing
-the layer-24 vectors.
+## Layer indexing
 
-The autoencoder run writes `codes.npy` with shape `[activation_rows, code_length]`,
-a `training-history.json` trace, and a `faithfulness.json` summary. The summary
-holds the relative reconstruction error, the independent-reader gap, the
-gist-versus-specific probe scores when a labeled attribute is supplied, and the
-code-usage statistics. `records.json` binds every array and JSON file to a
-SHA-256 digest, and `run.json` records the model, layer, and method.
+The primary J-lens hooks block index 24 and reads the state exposed as
+`hidden_states[25]`. The autoencoder reads `hidden_states[24]`. The primary
+runs use adjacent residual states and are not a matched-layer comparison.
 
-## Current status
+The separate cross-method runner aligns a hidden-state index `m` with block
+index `m - 1`.
 
-The primary Qwen3-8B runs are complete. The controlled 13-token J-lens estimate
-covers 1,000 contexts and 15,620,093 position pairs. Its held-out trajectory
-protocol finds a small matched-prompt contrast and confirms that direct coordinate
-edits change the coordinate read back at the same layer. That readback is not a
-downstream reasoning effect. The verbal-report and selectivity text scorers
-saturate and do not measure an effect. The fixed-symbol autoencoder collapses to
-two code strings and does not beat the zero predictor. These are bounded negative
-and partial results, not empirical reproductions of either full source method.
+## Files
 
-## Limitations
+- `artifacts/colab/qwen3-8b-layer-24-merged`
+- `artifacts/colab/qwen3-8b-layer-24-evaluate`
+- `artifacts/colab/nla-qwen3-8b`
+- `artifacts/qwen3-4b-bit-budget-layer18`
+- `artifacts/manifest.json`
+- `configs/qwen-publication.toml`
+- `configs/nla-publication.toml`
 
-The 13-token bank omits almost all vocabulary concepts and all selected
-multi-token concepts. Controlled-subset ablation is not vocabulary-wide
-J-space suppression, occupancy measurement, or top-k decomposition. The sparse
-nonnegative utility is not the source paper's gradient-pursuit implementation.
-Evaluation uses Qwen's chat template and records generation-time activation
-trajectories with incremental KV caching. The same protocol is repeated with
-logit-lens directions. Intervention effects can still reflect model-specific
-tokenization, prompting, or generation behavior. Functional workspace evidence
-does not establish consciousness.
+Every retained record file contains SHA-256 values for its referenced arrays
+and JSON files. Run the local verifier with this command.
 
-The autoencoder machinery uses a discrete symbol code in place of real words in
-both local tests and the accelerator run, so it measures the surrogate and audit
-mechanics rather than the readability of natural-language descriptions. A low
-reconstruction error is not sufficient evidence of a faithful description. The
-independent-reader gap and the gist-versus-specific probe are the checks that
-separate a faithful code from a co-adapted private code or a gist-only code. The
-measured run supplied no labeled specific targets, so the gist probe was not run.
+```bash
+qwen-j-lens verify-artifacts --root artifacts
+```
 
-The straight-through discrete bottleneck is unstable across random seeds. Refitting
-one fixed configuration twenty times on real Qwen3-4B layer-18 activations shows the
-fit collapses onto a near-constant code on most seeds, with a within-configuration
-error spread up to 0.9510 that exceeds every difference between the configurations
-tested. A single-seed reconstruction error from this bottleneck is a draw from a
-bimodal distribution rather than a measurement, so it should be reported over several
-seeds together with a trivial-predictor baseline. The evidence is in
-`artifacts/qwen3-4b-bit-budget-layer18` and the diagnostic lives in
-`src/qwen_j_lens/nla/capacity.py`.
+## Limits
 
-## Project links
+The token bank omits almost the entire vocabulary. The trajectory scores are
+raw cosine measurements rather than calibrated lens probabilities. Directed
+modulation compares unedited prompts. The internal reasoning protocol reads a
+coordinate changed at the same layer. The text scorers saturate.
 
-The project article is
-[`article.md`](https://github.com/kotlarmilos/qwen-j-lens/blob/main/article.md).
-Expected publication locations are the
-[GitHub repository](https://github.com/kotlarmilos/qwen-j-lens),
-[model artifact](https://huggingface.co/kotlarmilos/qwen-j-lens),
-[evaluation dataset](https://huggingface.co/datasets/kotlarmilos/qwen-j-lens-evaluation),
-and [Space](https://huggingface.co/spaces/kotlarmilos/qwen-j-lens).
-They are not published by this release candidate.
+The autoencoder emits fixed IDs rather than natural language. Its result applies
+to this surrogate and training recipe. The smaller Qwen3-4B seed diagnostic
+shows fitting instability and does not establish a capacity limit.
 
-## Source
+The complete explanation is in `article.md`.
 
-Wes Gurnee and collaborators. *Verbalizable Representations Form a Global
-Workspace in Language Models*. Transformer Circuits, July 2026.
-https://transformer-circuits.pub/2026/workspace/index.html
-
-*Natural Language Autoencoders*. Transformer Circuits, 2026.
-https://transformer-circuits.pub/2026/nla/index.html
-
-*Train the Model, Not the Reader*. arXiv:2607.20379.
-https://arxiv.org/abs/2607.20379
+The implementation is available at
+`https://github.com/kotlarmilos/qwen-j-lens`.

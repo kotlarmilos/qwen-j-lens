@@ -1,12 +1,11 @@
-"""Measure the bit-budget frontier and the optimization stability of the code.
+"""Measure code-shape, decoder-width, and seed sensitivity.
 
-The natural-language autoencoder reports a relative reconstruction error, and a
-low value is easy to over-read. This script separates three explanations for any
-value it produces. The first is capacity, which the bit-budget sweep varies. The
-second is the decoder, which the width control varies at a fixed bit budget. The
-third is optimization luck, which the seed controls vary with everything else
-held fixed. A principal-component reference converted to bits gives a continuous
-code to compare against at a matched budget.
+The fixed-symbol autoencoder reports a relative reconstruction error, and a low
+value is easy to over-read. This script varies nominal code bits, decoder width,
+and random seed. Its principal-component reconstruction is fitted and scored on
+the same activation matrix. The reported coefficient bits exclude the shared
+basis and mean, so it is a reconstruction reference rather than a matched
+rate-distortion comparison.
 
 Activations are collected once from the real model and cached, because the
 collection stage dominates the runtime on a CPU host and every sweep reads the
@@ -50,16 +49,16 @@ from qwen_j_lens.qwen import QwenAdapter
 # that the only axis is the number of code slots, which is the bit budget.
 PRIMARY_SPECS = [(length, 64, 1024) for length in (4, 8, 16, 32, 64, 128, 256)]
 
-# Four shapes that all cost ninety-six bits. If bits were the binding constraint
-# these would agree, so any disagreement rules capacity out as the explanation.
+# Four shapes with the same nominal bit count. Differences show that code shape
+# and fitting behavior matter in addition to the nominal count.
 EQUAL_BIT_SPECS = [(16, 64, 1024), (24, 16, 1024), (48, 4, 1024), (12, 256, 1024)]
 
 # One bit budget across three decoder widths, which separates the code from the
 # network that reads it.
 WIDTH_SPECS = [(32, 64, 256), (32, 64, 1024), (32, 64, 4096)]
 
-# A rank-k float32 linear code costs thirty-two bits per component, which puts
-# the continuous reference on the same axis as the discrete one.
+# Count only one float32 coefficient per retained component. This excludes the
+# shared basis and mean and is therefore not a complete storage budget.
 BITS_PER_COMPONENT = 32
 REFERENCE_RANKS = [0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 
@@ -203,11 +202,18 @@ def main() -> None:
 
     report = {
         "method": (
-            "bit-budget frontier and optimization-stability control for the "
-            "discrete natural-language code, measured on real activations with a "
-            "principal-component reference converted to bits at thirty-two bits "
-            "per retained component"
+            "code-shape, decoder-width, and seed-sensitivity controls for the "
+            "fixed-symbol autoencoder, with an in-sample principal-component "
+            "reconstruction reference"
         ),
+        "normalization": {
+            "name": "centered_relative_squared_error",
+            "formula": (
+                "mean(||reconstruction - target||^2) / "
+                "mean(||target - mean(target)||^2)"
+            ),
+            "mean_predictor": 1.0,
+        },
         "critique": "arXiv:2607.20379",
         "model_id": payload["model_id"],
         "model_revision": payload["revision"],

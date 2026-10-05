@@ -2,8 +2,8 @@
   "activation_rows": 9877,
   "baselines": {
     "constant_energy_fraction": 0.014913618564605713,
-    "mean_predictor": 0.9850863814353943,
-    "zero_predictor": 1.0
+    "mean_predictor": 1.0,
+    "zero_predictor": 1.0151394605636597
   },
   "bit_budget_sweep_entropy_0_01": [
     {
@@ -137,7 +137,7 @@
   ],
   "bits_per_linear_component": 32,
   "calibration_prompts": 64,
-  "collapse_threshold": 0.9850863814353943,
+  "collapse_threshold": 1.0,
   "command": "python scripts/bit_budget_study.py --config configs/cross-4b-dev.toml --corpus data/publication_calibration_prompts.jsonl --prompts 64",
   "critique": "arXiv:2607.20379",
   "decoder_width_control": [
@@ -169,6 +169,19 @@
       "width": 4096
     }
   ],
+  "derived_recalculation": {
+    "date": "2026-10-04",
+    "method": "Recomputed trivial baselines from the saved activation cache and rescaled the saved PCA residual errors from the prior uncentered denominator to the centered denominator. Reapplied the seed escape threshold at error < 1.0.",
+    "preserved_measurements": [
+      "all discrete-autoencoder sweep errors and code-usage values",
+      "all per-seed relative-error arrays and code-usage arrays",
+      "all training hyperparameters and run metadata"
+    ],
+    "source_activation_cache": ".cache/activations-4b-layer18.pt",
+    "source_activation_cache_sha256": "245b592d4f925776f9fa242eee4e0069d1cc33c4aa84011d67f12896dc87f06a",
+    "source_artifact_sha256": "d6cc42ba284791257fbe28da074b7317139376be499d1dee05e1c37543227c04",
+    "source_rank_zero_relative_error": 0.9850863814353943
+  },
   "device": "cpu",
   "dtype": "bfloat16 weights, float32 analysis",
   "equal_bit_shape_control": [
@@ -215,62 +228,67 @@
     {
       "bits": 0,
       "rank": 0,
-      "relative_error": 0.9850863814353943
+      "relative_error": 1.0
     },
     {
       "bits": 32,
       "rank": 1,
-      "relative_error": 0.010383350774645805
+      "relative_error": 0.010540548712015152
     },
     {
       "bits": 64,
       "rank": 2,
-      "relative_error": 0.006774272304028273
+      "relative_error": 0.006876830942928791
     },
     {
       "bits": 128,
       "rank": 4,
-      "relative_error": 0.00639698700979352
+      "relative_error": 0.006493833847343922
     },
     {
       "bits": 256,
       "rank": 8,
-      "relative_error": 0.005895417183637619
+      "relative_error": 0.005984670482575893
     },
     {
       "bits": 512,
       "rank": 16,
-      "relative_error": 0.00529576325789094
+      "relative_error": 0.005375938024371862
     },
     {
       "bits": 1024,
       "rank": 32,
-      "relative_error": 0.004621353466063738
+      "relative_error": 0.004691318143159151
     },
     {
       "bits": 2048,
       "rank": 64,
-      "relative_error": 0.003851011861115694
+      "relative_error": 0.003909314051270485
     },
     {
       "bits": 4096,
       "rank": 128,
-      "relative_error": 0.0029664658941328526
+      "relative_error": 0.0030113765969872475
     },
     {
       "bits": 8192,
       "rank": 256,
-      "relative_error": 0.001987048424780369
+      "relative_error": 0.002017131308093667
     },
     {
       "bits": 16384,
       "rank": 512,
-      "relative_error": 0.0011006100103259087
+      "relative_error": 0.0011172726517543197
     }
   ],
-  "method": "bit-budget frontier and optimization-stability control for the discrete natural-language code, measured on real activations with a principal-component reference converted to bits at thirty-two bits per retained component",
+  "method": "code-shape, decoder-width, and seed-sensitivity controls for the fixed-symbol autoencoder, with an in-sample principal-component reconstruction reference",
   "model_id": "Qwen/Qwen3-4B-Instruct-2507",
   "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "normalization": {
+    "formula": "mean(||reconstruction - target||^2) / mean(||target - mean(target)||^2)",
+    "mean_predictor": 1.0,
+    "name": "centered_relative_squared_error"
+  },
   "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
   "published_code_bits": 24.0,
   "seed": 20260712,

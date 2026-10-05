@@ -36,8 +36,8 @@ def collect_layer_activations(
     """Return one activation row per attended token at ``layer_index``.
 
     The activation is read from ``ModelRun.hidden_states`` where index ``0`` is
-    the embedding output and index ``k`` is the residual stream after block
-    ``k``. Only positions with an attention mask of one contribute a row, so
+    the embedding output and index ``k >= 1`` is the residual stream after block
+    ``k - 1``. Only positions with an attention mask of one contribute a row, so
     padding never enters the autoencoder corpus.
     """
     _validate_layer(adapter, layer_index)

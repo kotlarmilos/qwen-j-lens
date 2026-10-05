@@ -89,9 +89,36 @@ def main() -> int:
     )
     parser.add_argument("--count", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=20260712)
+    parser.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="Verify the existing corpus and metadata without loading the dataset.",
+    )
     args = parser.parse_args()
     if args.count <= 0:
         raise ValueError("--count must be positive")
+
+    metadata_path = args.output.with_suffix(".metadata.json")
+    if args.verify_only:
+        if not args.output.is_file() or not metadata_path.is_file():
+            raise FileNotFoundError("Publication corpus or metadata is missing")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        expected = {
+            "config": DATASET_CONFIG,
+            "count": args.count,
+            "dataset": DATASET_ID,
+            "revision": DATASET_REVISION,
+            "seed": args.seed,
+            "split": "train",
+        }
+        for key, value in expected.items():
+            if metadata.get(key) != value:
+                raise ValueError(f"Corpus metadata mismatch for {key}")
+        actual = _sha256(args.output)
+        if metadata.get("output_sha256") != actual:
+            raise ValueError("Publication corpus SHA-256 does not match metadata")
+        print(actual)
+        return 0
 
     try:
         from datasets import load_dataset
@@ -113,7 +140,6 @@ def main() -> int:
         for record in records
     )
     args.output.write_text(encoded, encoding="utf-8")
-    metadata_path = args.output.with_suffix(".metadata.json")
     metadata_path.write_text(
         json.dumps(
             {

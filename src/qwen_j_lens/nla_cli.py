@@ -1,4 +1,4 @@
-"""Command-line entry point for the natural-language autoencoder path."""
+"""Command-line entry point for the fixed-symbol autoencoder experiment."""
 
 from __future__ import annotations
 
@@ -217,8 +217,8 @@ def execute_nla(
                 None if specific_targets is None else portable_path(specific_targets)
             ),
             "method": (
-                "verbalize activations to a discrete code, reconstruct, and audit "
-                "faithfulness with an independent reader and a specific-attribute probe"
+                "encode activations as fixed symbol IDs, reconstruct them, and "
+                "compare reader errors and optional specific-attribute retention"
             ),
             "source": "https://transformer-circuits.pub/2026/nla/index.html",
             "critique": "arXiv:2607.20379",

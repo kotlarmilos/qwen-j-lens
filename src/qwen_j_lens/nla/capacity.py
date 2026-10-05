@@ -1,25 +1,20 @@
-"""Capacity diagnostics for the discrete natural-language autoencoder code.
+"""Seed and code-shape diagnostics for the fixed-symbol autoencoder.
 
 The autoencoder compresses a residual-stream row into `code_length` discrete
 slots drawn from a vocabulary of `code_vocab` symbols. The reported metric is a
-relative reconstruction error normalized by the mean squared norm of the target,
-so a value near zero reads as faithful compression and a value near one reads as
-a code that carries no more than a constant predictor would.
+relative reconstruction error normalized by centered activation energy. A value
+near zero is low reconstruction error on the evaluated rows. A value at or above
+one does not outperform the constant-mean predictor on aggregate.
 
-That reading is only sound when two conditions hold. The activation sample has
-to be diverse enough that reconstructing it requires real information, and the
-discrete bottleneck has to use more than a handful of its available codes. This
-module measures both conditions directly so a reconstruction number can be
-interpreted rather than taken at face value.
-
-The three diagnostics are a pair of trivial predictor baselines, a sweep over
-activation-row count at fixed hyperparameters, and a sweep over the entropy
-bonus that reports how many distinct codes the trained bottleneck actually uses.
+The retained diagnostic compares trivial predictors, an in-sample linear
+reference, code shapes, decoder widths, and random seeds. It measures fitting
+instability for the tested configurations. It does not identify an information
+capacity limit.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Sequence
 
 import math
@@ -47,25 +42,14 @@ class CodeUsage:
 class TrivialBaselines:
     """Reconstruction error of predictors that carry no per-row information.
 
-    The zero predictor is exactly one by construction because the metric divides
-    by the mean squared norm. The mean predictor is the honest floor, since any
-    code that scores above it has learned less than a single constant vector.
+    The mean predictor is exactly one because the metric divides by centered
+    activation energy. The zero predictor is measured on that same denominator
+    and can be larger when the activation mean carries energy.
     """
 
     zero_predictor: float
     mean_predictor: float
     constant_energy_fraction: float
-
-
-@dataclass(frozen=True)
-class SweepPoint:
-    """One measured configuration in a capacity sweep."""
-
-    rows: int
-    entropy_weight: float
-    relative_error: float
-    distinct_codes: int
-    code_entropy: float
 
 
 @dataclass(frozen=True)
@@ -93,9 +77,8 @@ class LinearReferencePoint:
 class SeedStability:
     """Spread of one fixed configuration refit under several random seeds.
 
-    A bit budget only explains an outcome if the outcome is reproducible at that
-    budget. When `spread` is comparable to the distance between budgets, the
-    sweep is measuring optimization luck rather than capacity.
+    Large within-configuration spread limits any attribution of differences
+    between configurations to nominal code bits.
     """
 
     seeds: tuple[int, ...]
@@ -125,19 +108,21 @@ def linear_reference(
 ) -> list[LinearReferencePoint]:
     """Relative error of reconstructing rows from their top principal components.
 
-    This is the continuous counterpart to the discrete code. Rank zero keeps only
-    the mean and therefore reproduces the constant-predictor baseline exactly, so
-    the curve says how much of the residual stream is linearly compressible at
-    all. It bounds what any faithful discrete code has to compete with.
+    Rank zero keeps only the mean and reproduces the constant-mean baseline.
+    Higher ranks provide an in-sample reconstruction reference because the PCA
+    basis is fitted and scored on the same matrix. This function does not count
+    storage for the shared basis or mean.
     """
     if activations.ndim != 2:
         raise ValueError("Activations must be a two-dimensional row matrix")
     target = activations.to(torch.float32)
-    energy = target.pow(2).sum(dim=-1).mean()
-    if float(energy) == 0.0:
-        raise ValueError("Activations carry no energy, so the metric is undefined")
     mean = target.mean(dim=0, keepdim=True)
     centered = target - mean
+    energy = centered.pow(2).sum(dim=-1).mean()
+    if float(energy) == 0.0:
+        raise ValueError(
+            "Activations carry no centered energy, so the metric is undefined"
+        )
     covariance = (centered.T @ centered) / centered.shape[0]
     _, eigenvectors = torch.linalg.eigh(covariance)
     ordered = eigenvectors.flip(-1)
@@ -159,23 +144,28 @@ def linear_reference(
 def trivial_baselines(activations: Tensor) -> TrivialBaselines:
     """Measure the reconstruction error of the zero and mean predictors.
 
-    A trained code that does not score below `mean_predictor` has extracted no
-    per-row information, whatever its absolute value looks like.
+    A trained code that does not score below `mean_predictor` does not improve
+    on the constant-mean predictor on aggregate.
     """
     if activations.ndim != 2:
         raise ValueError("Activations must be a two-dimensional row matrix")
     if activations.shape[0] == 0:
         raise ValueError("Activations must contain at least one row")
     target = activations.to(torch.float32)
-    energy = target.pow(2).sum(dim=-1).mean()
-    if float(energy) == 0.0:
-        raise ValueError("Activations carry no energy, so the metric is undefined")
-    centered = target - target.mean(dim=0, keepdim=True)
-    mean_error = float(centered.pow(2).sum(dim=-1).mean() / energy)
+    mean = target.mean(dim=0, keepdim=True)
+    centered = target - mean
+    centered_energy = centered.pow(2).sum(dim=-1).mean()
+    if float(centered_energy) == 0.0:
+        raise ValueError(
+            "Activations carry no centered energy, so the metric is undefined"
+        )
+    uncentered_energy = target.pow(2).sum(dim=-1).mean()
     return TrivialBaselines(
-        zero_predictor=1.0,
-        mean_predictor=mean_error,
-        constant_energy_fraction=1.0 - mean_error,
+        zero_predictor=float(uncentered_energy / centered_energy),
+        mean_predictor=1.0,
+        constant_energy_fraction=float(
+            1.0 - centered_energy / uncentered_energy
+        ),
     )
 
 
@@ -242,111 +232,6 @@ def _fit(
     return result.final_relative_error, usage
 
 
-def row_count_sweep(
-    activations: Tensor,
-    row_counts: Sequence[int],
-    *,
-    code_length: int,
-    code_vocab: int,
-    width: int,
-    embedding_dim: int,
-    temperature: float,
-    steps: int,
-    lr: float,
-    batch_size: int,
-    entropy_weight: float,
-    seed: int,
-) -> list[SweepPoint]:
-    """Refit the autoencoder on growing prefixes of one activation matrix.
-
-    Model, layer, and hyperparameters are held fixed, so the only variable is how
-    many rows the code has to cover. A low error that appears only at small row
-    counts is a redundancy artifact rather than evidence of compression.
-    """
-    if activations.ndim != 2:
-        raise ValueError("Activations must be a two-dimensional row matrix")
-    points: list[SweepPoint] = []
-    for count in row_counts:
-        if count <= 0:
-            raise ValueError("Row counts must be positive")
-        if count > activations.shape[0]:
-            continue
-        error, usage = _fit(
-            activations[:count],
-            code_length=code_length,
-            code_vocab=code_vocab,
-            width=width,
-            embedding_dim=embedding_dim,
-            temperature=temperature,
-            steps=steps,
-            lr=lr,
-            batch_size=batch_size,
-            entropy_weight=entropy_weight,
-            seed=seed,
-        )
-        points.append(
-            SweepPoint(
-                rows=count,
-                entropy_weight=entropy_weight,
-                relative_error=error,
-                distinct_codes=usage.distinct_codes,
-                code_entropy=usage.code_entropy,
-            )
-        )
-    return points
-
-
-def entropy_weight_sweep(
-    activations: Tensor,
-    entropy_weights: Sequence[float],
-    *,
-    code_length: int,
-    code_vocab: int,
-    width: int,
-    embedding_dim: int,
-    temperature: float,
-    steps: int,
-    lr: float,
-    batch_size: int,
-    seed: int,
-) -> list[SweepPoint]:
-    """Refit the autoencoder across entropy bonuses on a fixed row set.
-
-    The entropy bonus is the only term that opposes code collapse. Sweeping it
-    separates a bottleneck that cannot represent the data from one that simply
-    never learned to use its symbols.
-    """
-    if activations.ndim != 2:
-        raise ValueError("Activations must be a two-dimensional row matrix")
-    points: list[SweepPoint] = []
-    for weight in entropy_weights:
-        if weight < 0.0:
-            raise ValueError("Entropy weights must not be negative")
-        error, usage = _fit(
-            activations,
-            code_length=code_length,
-            code_vocab=code_vocab,
-            width=width,
-            embedding_dim=embedding_dim,
-            temperature=temperature,
-            steps=steps,
-            lr=lr,
-            batch_size=batch_size,
-            entropy_weight=weight,
-            seed=seed,
-        )
-        points.append(
-            SweepPoint(
-                rows=activations.shape[0],
-                entropy_weight=weight,
-                relative_error=error,
-                distinct_codes=usage.distinct_codes,
-                code_entropy=usage.code_entropy,
-            )
-        )
-    return points
-
-
 def bit_budget_sweep(
     activations: Tensor,
     specs: Sequence[tuple[int, int, int]],
@@ -361,11 +246,9 @@ def bit_budget_sweep(
 ) -> list[BitBudgetPoint]:
     """Refit the autoencoder across code shapes and decoder widths.
 
-    Each spec is a `(code_length, code_vocab, width)` triple. Sweeping the code
-    shape answers how many bits the bottleneck needs, and carrying `width` as an
-    explicit axis matters because the decoder passes the code through a hidden
-    layer of that size on the way to the activation. If width binds before bits
-    do, then the measured frontier describes the decoder rather than the code.
+    Each spec is a `(code_length, code_vocab, width)` triple. The sweep records
+    fitted outcomes across nominal code shapes and decoder widths. It is not an
+    optimal capacity frontier.
     """
     if activations.ndim != 2:
         raise ValueError("Activations must be a two-dimensional row matrix")
@@ -414,9 +297,8 @@ def seed_stability(
 ) -> SeedStability:
     """Refit one configuration under several seeds and report the spread.
 
-    Everything except the seed is held fixed, so the resulting range isolates the
-    contribution of initialization and batch order. This is the control that
-    decides whether a bit-budget curve is a capacity frontier or a scatter plot.
+    Everything except the seed is held fixed, so the resulting range measures
+    sensitivity to initialization and batch order under one training recipe.
     """
     if activations.ndim != 2:
         raise ValueError("Activations must be a two-dimensional row matrix")
@@ -455,70 +337,3 @@ def seed_stability(
         median=median,
         spread=ordered[-1] - ordered[0],
     )
-
-
-def capacity_report(
-    activations: Tensor,
-    *,
-    row_counts: Sequence[int],
-    entropy_weights: Sequence[float],
-    code_length: int,
-    code_vocab: int,
-    width: int,
-    embedding_dim: int,
-    temperature: float,
-    steps: int,
-    lr: float,
-    batch_size: int,
-    entropy_weight: float,
-    seed: int,
-) -> dict[str, object]:
-    """Run every capacity diagnostic and return one serializable report."""
-    baselines = trivial_baselines(activations)
-    rows = row_count_sweep(
-        activations,
-        row_counts,
-        code_length=code_length,
-        code_vocab=code_vocab,
-        width=width,
-        embedding_dim=embedding_dim,
-        temperature=temperature,
-        steps=steps,
-        lr=lr,
-        batch_size=batch_size,
-        entropy_weight=entropy_weight,
-        seed=seed,
-    )
-    weights = entropy_weight_sweep(
-        activations,
-        entropy_weights,
-        code_length=code_length,
-        code_vocab=code_vocab,
-        width=width,
-        embedding_dim=embedding_dim,
-        temperature=temperature,
-        steps=steps,
-        lr=lr,
-        batch_size=batch_size,
-        seed=seed,
-    )
-    best = min(weights, key=lambda point: point.relative_error) if weights else None
-    return {
-        "method": (
-            "capacity diagnostics for the discrete autoencoder code: trivial "
-            "predictor baselines, an activation-row sweep at fixed "
-            "hyperparameters, and an entropy-bonus sweep with code occupancy"
-        ),
-        "activation_rows": int(activations.shape[0]),
-        "hidden_size": int(activations.shape[1]),
-        "available_codes": code_vocab**code_length,
-        "baselines": asdict(baselines),
-        "row_count_sweep": [asdict(point) for point in rows],
-        "entropy_weight_sweep": [asdict(point) for point in weights],
-        "best_entropy_weight": asdict(best) if best is not None else None,
-        "beats_mean_predictor": (
-            bool(best.relative_error < baselines.mean_predictor)
-            if best is not None
-            else False
-        ),
-    }

@@ -1,4 +1,4 @@
-"""TOML configuration for the natural-language autoencoder path."""
+"""TOML configuration for the fixed-symbol autoencoder experiment."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ def _positive_float(value: Mapping[str, Any], key: str, default: float | None = 
 
 
 def load_nla_config(path: str | Path) -> NLARunConfig:
-    """Read and validate a natural-language autoencoder run configuration."""
+    """Read and validate a fixed-symbol autoencoder run configuration."""
     config_path = Path(path)
     with config_path.open("rb") as stream:
         raw = tomllib.load(stream)

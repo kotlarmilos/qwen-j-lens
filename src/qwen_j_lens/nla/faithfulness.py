@@ -1,13 +1,8 @@
-"""Faithfulness audits for verbalized activation codes.
+"""Reader and attribute-retention checks for fixed-symbol activation codes.
 
-Reconstruction quality alone does not prove that a natural-language code is a
-good explanation. The ``RECAP`` critique, *Train the Model, Not the Reader*,
-shows two ways a high-reconstruction code can still mislead a human reader. The
-first is a co-adapted private code: the reconstructor and verbalizer agree on a
-scheme that a fresh, independent reader cannot decode. The second is a gist
-code: the text captures coarse structure but drops the specific fact the
-activation carried. This module measures both effects with deterministic linear
-algebra and small held-out reconstructors.
+Reconstruction quality alone does not show that a code generalizes to a new
+reader or retains a labeled attribute. These checks measure those narrower
+properties. They do not establish human-readable semantics for symbol IDs.
 """
 
 from __future__ import annotations
@@ -78,9 +73,9 @@ def independent_reader_gap(
     The co-adapted reader trains on every code, including the held-out ones, so
     it can memorize an example-specific scheme. The independent reader trains
     only on the training split and is scored on the held-out split. When the
-    code is a generalizable description the two test errors are close. When the
-    code is a private, example-specific scheme the independent reader fails and
-    the gap grows.
+    code-to-activation mapping generalizes, the two test errors can be close.
+    When the code is example-specific, the independent reader can fail and the
+    gap can grow. A small gap remains uninformative when both errors are high.
     """
     code_onehot = _one_hot(codes, code_vocab)
     train_index = train_index.to(activations.device)
@@ -211,7 +206,7 @@ def code_usage(codes: Tensor, code_vocab: int) -> dict[str, float]:
 
 @dataclass(frozen=True)
 class FaithfulnessReport:
-    """Aggregated faithfulness measurements with threshold-based flags."""
+    """Aggregate reader and attribute-retention measurements."""
 
     reconstruction_error: float
     independent_reader: Mapping[str, float]
@@ -221,19 +216,15 @@ class FaithfulnessReport:
     retained_threshold: float
 
     @property
-    def private_code_suspected(self) -> bool:
+    def reader_gap_exceeds_threshold(self) -> bool:
         return self.independent_reader["gap"] > self.gap_threshold
 
     @property
-    def gist_only_suspected(self) -> bool:
+    def specific_retention_below_threshold(self) -> bool:
         return (
             self.gist_versus_specific["specific_retained_fraction"]
             < self.retained_threshold
         )
-
-    @property
-    def faithful(self) -> bool:
-        return not self.private_code_suspected and not self.gist_only_suspected
 
     def to_mapping(self) -> dict[str, Any]:
         return {
@@ -246,8 +237,14 @@ class FaithfulnessReport:
                 "specific_retained": self.retained_threshold,
             },
             "flags": {
-                "private_code_suspected": self.private_code_suspected,
-                "gist_only_suspected": self.gist_only_suspected,
-                "faithful": self.faithful,
+                "reader_gap_exceeds_threshold": self.reader_gap_exceeds_threshold,
+                "specific_retention_below_threshold": (
+                    self.specific_retention_below_threshold
+                ),
             },
+            "interpretation": (
+                "Reader errors and reconstruction baselines must be inspected "
+                "directly. These flags do not establish faithfulness or "
+                "human-readable symbol semantics."
+            ),
         }
